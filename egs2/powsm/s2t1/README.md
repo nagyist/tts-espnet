@@ -1,4 +1,12 @@
 # 🐁POWSM
+<p align="left">
+  <a href="https://arxiv.org/abs/2510.24992">
+    <img src="https://img.shields.io/badge/arXiv-2510.24992-red.svg?logo=arxiv&logoColor=red"/>
+  </a>
+  <a href="https://huggingface.co/espnet/powsm">
+    <img src="https://img.shields.io/badge/HuggingFace-POWSM-yellow.svg?logo=huggingface&logoColor=yellow"/>
+  </a>
+</p>
 
 POWSM is the first phonetic foundation model that can perform four phone-related tasks:
 Phone Recognition (PR), Automatic Speech Recognition (ASR), audio-guided grapheme-to-phoneme conversion (G2P), and audio-guided phoneme-to-grapheme
