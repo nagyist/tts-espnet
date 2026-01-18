@@ -1,8 +1,7 @@
 import os
-from pathlib import Path
-
 import soundfile as sf
 from datasets import load_dataset
+from pathlib import Path
 
 
 def prepare_data():
@@ -10,7 +9,7 @@ def prepare_data():
     # Load dataset - it will use 'audio_path' and 'text'
     ds = load_dataset("Professor/kinyarwanda-tts-dataset-kin")
 
-    split_map = {"train": "train", "test": "test", "validation": "dev"}
+    split_map = {'train': 'train', 'test': 'test', 'validation': 'dev'}
 
     for hf_split, espnet_split in split_map.items():
         print(f"Processing {hf_split} -> data/{espnet_split}")
@@ -19,38 +18,28 @@ def prepare_data():
         data_dir.mkdir(parents=True, exist_ok=True)
         wav_dir.mkdir(parents=True, exist_ok=True)
 
-        with (
-            open(data_dir / "text", "w", encoding="utf-8") as f_text,
-            open(data_dir / "wav.scp", "w", encoding="utf-8") as f_wav,
-            open(data_dir / "utt2spk", "w", encoding="utf-8") as f_u2s,
-        ):
+        text_file = data_dir / "text"
+        wav_file = data_dir / "wav.scp"
+        u2s_file = data_dir / "utt2spk"
+
+        with open(text_file, "w", encoding="utf-8") as f_text, \
+             open(wav_file, "w", encoding="utf-8") as f_wav, \
+             open(u2s_file, "w", encoding="utf-8") as f_u2s:
 
             for i, example in enumerate(ds[hf_split]):
                 utt_id = f"rw_{espnet_split}_{i:05d}"
 
-                # 1. Use the correct column names from your Error Message
-                transcript = example["text"]
-                audio_data = example["audio_path"]  # This is likely the audio dict
+                # 1. Use the correct column names
+                transcript = example['text']
+                audio_data = example['audio_path']
 
                 try:
-                    # Write the WAV file to disk so ESPnet can use it
+                    # Write the WAV file to disk
                     wav_path = wav_dir / f"{utt_id}.wav"
+                    sr = audio_data['sampling_rate']
+                    arr = audio_data['array']
 
-                    # If audio_path is a dict with 'array', use that
-                    if isinstance(audio_data, dict) and "array" in audio_data:
-                        sf.write(
-                            str(wav_path),
-                            audio_data["array"],
-                            audio_data["sampling_rate"],
-                        )
-                    else:
-                        # If it's just a path/bytes, we might need to decode it
-                        # But usually HF 'Audio' types return a dict
-                        sf.write(
-                            str(wav_path),
-                            audio_data["array"],
-                            audio_data["sampling_rate"],
-                        )
+                    sf.write(str(wav_path), arr, sr)
 
                     # 2. Write Kaldi files
                     f_text.write(f"{utt_id} {transcript}\n")
@@ -59,15 +48,14 @@ def prepare_data():
 
                 except Exception as e:
                     if i < 5:  # Print first few errors to debug
-                        print(
-                            f"Failed to process example {i}: {e}. Data type: {type(audio_data)}"
-                        )
+                        print(f"Error {i}: {e}. Type: {type(audio_data)}")
                     continue
 
-        # Generate spk2utt
-        os.system(
-            f"utils/utt2spk_to_spk2utt.pl data/{espnet_split}/utt2spk > data/{espnet_split}/spk2utt"
-        )
+        # Generate spk2utt using a split command string to pass linting
+        u2s_path = f"data/{espnet_split}/utt2spk"
+        s2u_path = f"data/{espnet_split}/spk2utt"
+        cmd = f"utils/utt2spk_to_spk2utt.pl {u2s_path} > {s2u_path}"
+        os.system(cmd)
 
 
 if __name__ == "__main__":
