@@ -7,7 +7,7 @@ from datasets import load_dataset
 
 def prepare_data():
     print("Loading dataset from Hugging Face...")
-    # Load dataset - it will use 'audio_path' and 'text' which are the correct column names
+    # Load dataset - it will use 'audio_path' and 'text'
     ds = load_dataset("Professor/kinyarwanda-tts-dataset-kin")
 
     split_map = {"train": "train", "test": "test", "validation": "dev"}
