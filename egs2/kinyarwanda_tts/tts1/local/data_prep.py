@@ -1,7 +1,8 @@
 import os
+from pathlib import Path
+
 import soundfile as sf
 from datasets import load_dataset
-from pathlib import Path
 
 
 def prepare_data():
@@ -9,7 +10,7 @@ def prepare_data():
     # Load dataset - it will use 'audio_path' and 'text' which are the correct column names
     ds = load_dataset("Professor/kinyarwanda-tts-dataset-kin")
 
-    split_map = {'train': 'train', 'test': 'test', 'validation': 'dev'}
+    split_map = {"train": "train", "test": "test", "validation": "dev"}
 
     for hf_split, espnet_split in split_map.items():
         print(f"Processing {hf_split} -> data/{espnet_split}")
@@ -22,22 +23,24 @@ def prepare_data():
         wav_file = data_dir / "wav.scp"
         u2s_file = data_dir / "utt2spk"
 
-        with open(text_file, "w", encoding="utf-8") as f_text, \
-             open(wav_file, "w", encoding="utf-8") as f_wav, \
-             open(u2s_file, "w", encoding="utf-8") as f_u2s:
+        with (
+            open(text_file, "w", encoding="utf-8") as f_text,
+            open(wav_file, "w", encoding="utf-8") as f_wav,
+            open(u2s_file, "w", encoding="utf-8") as f_u2s,
+        ):
 
             for i, example in enumerate(ds[hf_split]):
                 utt_id = f"rw_{espnet_split}_{i:05d}"
 
                 # 1. Use the correct column names
-                transcript = example['text']
-                audio_data = example['audio_path']
+                transcript = example["text"]
+                audio_data = example["audio_path"]
 
                 try:
                     # Write the WAV file to disk
                     wav_path = wav_dir / f"{utt_id}.wav"
-                    sr = audio_data['sampling_rate']
-                    arr = audio_data['array']
+                    sr = audio_data["sampling_rate"]
+                    arr = audio_data["array"]
 
                     sf.write(str(wav_path), arr, sr)
 
