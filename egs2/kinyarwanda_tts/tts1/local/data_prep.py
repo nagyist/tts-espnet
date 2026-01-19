@@ -6,7 +6,7 @@ from pathlib import Path
 
 def prepare_data():
     print("Loading dataset from Hugging Face...")
-    # Load dataset - it will use 'audio_path' and 'text'
+    # Load dataset - it will use 'audio_path' and 'text' which are the correct column names
     ds = load_dataset("Professor/kinyarwanda-tts-dataset-kin")
 
     split_map = {'train': 'train', 'test': 'test', 'validation': 'dev'}
