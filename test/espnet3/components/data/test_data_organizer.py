@@ -79,10 +79,8 @@ DUMMY_TRANSFORM_TARGET = (
 )
 
 
-DUMMY_DATASET_TARGET = "test.espnet3.components.test_data_organizer." "DummyDataset"
-DUMMY_TRANSFORM_TARGET = "test.espnet3.components.test_data_organizer." "DummyTransform"
 DUMMY_PREPROCESSOR_TARGET = (
-    "test.espnet3.components.test_data_organizer." "DummyPreprocessor"
+    "test.espnet3.components.data.test_data_organizer." "DummyPreprocessor"
 )
 
 
