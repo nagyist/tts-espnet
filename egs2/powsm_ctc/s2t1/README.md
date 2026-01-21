@@ -7,7 +7,7 @@
 POWSM-CTC is a variant of [POWSM](https://arxiv.org/abs/2510.24992),  the first phonetic foundation model that can perform four phone-related tasks.
 Its multi-task encoder-CTC structure is based on [OWSM-CTC](https://aclanthology.org/2024.acl-long.549/), and trained on [IPAPack++](https://huggingface.co/anyspeech), the same dataset as POWSM.
 
-POWSM-CTC is proposed together with our paper [PRiSM](https://arxiv.org/abs/2601.14046), the first open-source benchmark for phone recognition systems. 
+POWSM-CTC is proposed together with our paper [PRiSM](https://arxiv.org/abs/2601.14046), the first open-source benchmark for phone recognition systems.
 Its decoding is much faster than encoder-decoder models, with similar or enhanced PR performance on unseen domain.
 
 
@@ -47,7 +47,7 @@ Its decoding is much faster than encoder-decoder models, with similar or enhance
       eprint={2601.14046},
       archivePrefix={arXiv},
       primaryClass={cs.CL},
-      url={https://arxiv.org/abs/2601.14046}, 
+      url={https://arxiv.org/abs/2601.14046},
 }
 
 @inproceedings{zhu-etal-2025-zipa,
