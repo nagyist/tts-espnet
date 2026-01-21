@@ -1,22 +1,14 @@
 # 🐁POWSM-CTC
 <p align="left">
-  <a href="https://arxiv.org/abs/tbd">
-    <img src="https://img.shields.io/badge/arXiv-tbd-red.svg?logo=arxiv&logoColor=red"/>
-  </a>
-  <a href="https://huggingface.co/espnet/powsm">
-    <img src="https://img.shields.io/badge/HuggingFace-POWSM_CTC-yellow.svg?logo=huggingface&logoColor=yellow"/>
-  </a>
+  <a href="https://arxiv.org/abs/2601.14046"><img src="https://img.shields.io/badge/arXiv-2601.14046-red.svg?logo=arxiv&logoColor=red"/></a>
+  <a href="https://huggingface.co/espnet/powsm_ctc"><img src="https://img.shields.io/badge/HuggingFace-powsm_ctc-yellow.svg?logo=huggingface&logoColor=yellow"/></a>
 </p>
 
-POWSM-CTC is a variant of [POWSM](https://huggingface.co/espnet/powsm),  the first phonetic foundation model that can perform four phone-related tasks:
-Phone Recognition (PR), Automatic Speech Recognition (ASR), audio-guided grapheme-to-phoneme conversion (G2P), and audio-guided phoneme-to-grapheme
-conversion (P2G).
-Its multi-task encoder-CTC structure is based on [OWSM-CTC](https://aclanthology.org/2024.acl-long.549/), 
-and trained on the same dataset as POWSM, [IPAPack++](https://huggingface.co/anyspeech).
+POWSM-CTC is a variant of [POWSM](https://arxiv.org/abs/2510.24992),  the first phonetic foundation model that can perform four phone-related tasks.
+Its multi-task encoder-CTC structure is based on [OWSM-CTC](https://aclanthology.org/2024.acl-long.549/), and trained on [IPAPack++](https://huggingface.co/anyspeech), the same dataset as POWSM.
 
-POWSM-CTC is proposed together with our paper [PRiSM](tbd), the first open-source benchmark for phone recognition systems. 
+POWSM-CTC is proposed together with our paper [PRiSM](https://arxiv.org/abs/2601.14046), the first open-source benchmark for phone recognition systems. 
 Its decoding is much faster than encoder-decoder models, with similar or enhanced PR performance on unseen domain.
-The checkpoint is available on [HuggingFace](https://huggingface.co/espnet/powsm-ctc)!
 
 
 ### Guidelines
@@ -50,8 +42,12 @@ The checkpoint is available on [HuggingFace](https://huggingface.co/espnet/powsm
 ```BibTex
 @article{prism,
       title={PRiSM: Benchmarking Phone Realization in Speech Models},
+      author={Shikhar Bharadwaj and Chin-Jou Li and Yoonjae Kim and Kwanghee Choi and Eunjung Yeo and Ryan Soh-Eun Shim and Hanyu Zhou and Brendon Boldt and Karen Rosero Jacome and Kalvin Chang and Darsh Agrawal and Keer Xu and Chao-Han Huck Yang and Jian Zhu and Shinji Watanabe and David R. Mortensen},
       year={2026},
-      url="tbd",
+      eprint={2601.14046},
+      archivePrefix={arXiv},
+      primaryClass={cs.CL},
+      url={https://arxiv.org/abs/2601.14046}, 
 }
 
 @inproceedings{zhu-etal-2025-zipa,

@@ -1,11 +1,7 @@
 # 🐁POWSM
 <p align="left">
-  <a href="https://arxiv.org/abs/2510.24992">
-    <img src="https://img.shields.io/badge/arXiv-2510.24992-red.svg?logo=arxiv&logoColor=red"/>
-  </a>
-  <a href="https://huggingface.co/espnet/powsm">
-    <img src="https://img.shields.io/badge/HuggingFace-POWSM-yellow.svg?logo=huggingface&logoColor=yellow"/>
-  </a>
+  <a href="https://arxiv.org/abs/2510.24992"><img src="https://img.shields.io/badge/arXiv-2510.24992-red.svg?logo=arxiv&logoColor=red"/></a>
+  <a href="https://huggingface.co/espnet/powsm"><img src="https://img.shields.io/badge/HuggingFace-powsm-yellow.svg?logo=huggingface&logoColor=yellow"/></a>
 </p>
 
 POWSM is the first phonetic foundation model that can perform four phone-related tasks:
@@ -14,12 +10,10 @@ conversion (P2G).
 
 Based on [Open Whisper-style Speech Model (OWSM)](https://www.wavlab.org/activities/2024/owsm/) and trained with [IPAPack++](https://huggingface.co/anyspeech), POWSM outperforms or matches specialized PR models of similar size (Wav2Vec2Phoneme and ZIPA) while jointly supporting G2P, P2G, and ASR.
 
-The model checkpoint is available on [HuggingFace](https://huggingface.co/espnet/powsm)!
-
 
 ## Results
 
-Please refer to our paper for comprehensive evaluations, while below are selected results on phone recognition:
+Below are selected results on phone recognition:
 
 ### Unseen languages
 
