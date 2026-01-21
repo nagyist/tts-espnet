@@ -1,7 +1,8 @@
 # 🐁POWSM
 <p align="left">
-  <a href="https://arxiv.org/abs/2510.24992"><img src="https://img.shields.io/badge/arXiv-2510.24992-red.svg?logo=arxiv&logoColor=red"/></a>
-  <a href="https://huggingface.co/espnet/powsm"><img src="https://img.shields.io/badge/HuggingFace-powsm-yellow.svg?logo=huggingface&logoColor=yellow"/></a>
+  <a href="https://arxiv.org/abs/2510.24992"><img src="https://img.shields.io/badge/Paper-2510.24992-red.svg?logo=arxiv&logoColor=red"/></a>
+  <a href="https://huggingface.co/espnet/powsm"><img src="https://img.shields.io/badge/Model-powsm-yellow.svg?logo=huggingface&logoColor=yellow"/></a>
+  <a href="https://github.com/espnet/egs2/powsm/s2t1"><img src="https://img.shields.io/badge/Recipe-powsm-blue.svg?logo=github&logoColor=black"/></a>
 </p>
 
 POWSM is the first phonetic foundation model that can perform four phone-related tasks:

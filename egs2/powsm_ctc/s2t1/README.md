@@ -1,7 +1,9 @@
 # 🐁POWSM-CTC
 <p align="left">
-  <a href="https://arxiv.org/abs/2601.14046"><img src="https://img.shields.io/badge/arXiv-2601.14046-red.svg?logo=arxiv&logoColor=red"/></a>
-  <a href="https://huggingface.co/espnet/powsm_ctc"><img src="https://img.shields.io/badge/HuggingFace-powsm_ctc-yellow.svg?logo=huggingface&logoColor=yellow"/></a>
+  <a href="https://arxiv.org/abs/2601.14046"><img src="https://img.shields.io/badge/Paper-2601.14046-red.svg?logo=arxiv&logoColor=red"/></a>
+  <a href="https://huggingface.co/espnet/powsm_ctc"><img src="https://img.shields.io/badge/Model-powsm_ctc-yellow.svg?logo=huggingface&logoColor=yellow"/></a>
+  <a href="https://github.com/changelinglab/prism"><img src="https://img.shields.io/badge/Benchmark-PRiSM-green.svg?logo=github&logoColor=black"/></a>
+  <a href="https://github.com/espnet/egs2/powsm_ctc/s2t1"><img src="https://img.shields.io/badge/Recipe-powsm_ctc-blue.svg?logo=github&logoColor=black"/></a>
 </p>
 
 POWSM-CTC is a variant of [POWSM](https://arxiv.org/abs/2510.24992),  the first phonetic foundation model that can perform four phone-related tasks.

@@ -1616,7 +1616,7 @@ class AbsTask(ABC):
                     )
                     wandb.config.update(
                         args,
-                        allow_val_change=args.wandb_allow_val_change,  # to continue training
+                        allow_val_change=args.wandb_allow_val_change,
                     )
                 else:
                     # wandb also supports grouping for distributed training,
