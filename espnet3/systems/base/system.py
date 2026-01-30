@@ -40,7 +40,7 @@ class BaseSystem:
         """Initialize the system with optional stage configs."""
         self.train_config = train_config
         self.infer_config = infer_config
-        self.metric_config = measure_config
+        self.measure_config = measure_config
         if train_config is not None:
             self.exp_dir = Path(train_config.exp_dir)
             self.exp_dir.mkdir(parents=True, exist_ok=True)
@@ -111,10 +111,10 @@ class BaseSystem:
         """Compute evaluation metrics from hypothesis/reference outputs."""
         self._reject_stage_args("measure", args, kwargs)
         logger.info(
-            "Measurement start | metric_config=%s",
-            self.metric_config is not None,
+            "Measurement start | measure_config=%s",
+            self.measure_config is not None,
         )
-        result = measure(self.metric_config)
+        result = measure(self.measure_config)
         logger.info("Measurement results: %s", result)
         return result
 
