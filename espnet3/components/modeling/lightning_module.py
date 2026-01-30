@@ -251,7 +251,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 getattr(self.config, "optims", None) is None
             ), "Mixture of `optim` and `optims` is not allowed."
             params = filter(lambda p: p.requires_grad, self.parameters())
-            optimizer = instantiate(
+            optim = instantiate(
                 OmegaConf.to_container(self.config.optim, resolve=True), params
             )
 
@@ -260,7 +260,7 @@ class ESPnetLightningModule(lightning.LightningModule):
             ), "Mixture of `scheduler` and `schedulers` is not allowed."
             scheduler = instantiate(
                 OmegaConf.to_container(self.config.scheduler, resolve=True),
-                optimizer=optimizer,
+                optim=optim,
             )
 
         elif getattr(self.config, "optims", None) and getattr(
@@ -323,7 +323,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 not unused_param_ids
             ), f"{unused_param_ids} are not assigned to any optimizer"
 
-            optimizer = MultipleOptim(optims)
+            optim = MultipleOptim(optims)
 
             assert (
                 getattr(self.config, "scheduler", None) is None
@@ -333,12 +333,12 @@ class ESPnetLightningModule(lightning.LightningModule):
                 schedulers.append(
                     instantiate(
                         OmegaConf.to_container(scheduler.scheduler, resolve=True),
-                        optimizer=optims[i_sch],
+                        optim=optims[i_sch],
                     )
                 )
 
             scheduler = [
-                MultipleScheduler(optimizer, sch, i_sch)
+                MultipleScheduler(optim, sch, i_sch)
                 for i_sch, sch in enumerate(schedulers)
             ]
         else:
@@ -347,7 +347,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 "`schedulers`"
             )
         return {
-            "optimizer": optimizer,
+            "optimizer": optim,
             "lr_scheduler": {
                 "scheduler": scheduler,
                 "interval": "step",  # assuming lr scheduler is updated per step
