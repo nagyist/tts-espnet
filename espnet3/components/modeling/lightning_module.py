@@ -260,7 +260,7 @@ class ESPnetLightningModule(lightning.LightningModule):
             ), "Mixture of `scheduler` and `schedulers` is not allowed."
             scheduler = instantiate(
                 OmegaConf.to_container(self.config.scheduler, resolve=True),
-                optim=optim,
+                optimizer=optim,
             )
 
         elif getattr(self.config, "optims", None) and getattr(
@@ -333,7 +333,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 schedulers.append(
                     instantiate(
                         OmegaConf.to_container(scheduler.scheduler, resolve=True),
-                        optim=optims[i_sch],
+                        optimizer=optims[i_sch],
                     )
                 )
 

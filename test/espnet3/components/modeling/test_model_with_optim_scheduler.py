@@ -130,7 +130,7 @@ def test_multiple_optims_and_schedulers():
     )
     model = ESPnetLightningModule(DummyModel(), config)
     out = model.configure_optimizers()
-    assert hasattr(out["optimizer"], "optimizers")  # HybridOptim
+    assert hasattr(out["optimizer"], "optims")  # HybridOptim
     assert isinstance(out["lr_scheduler"]["scheduler"], list)
 
 
