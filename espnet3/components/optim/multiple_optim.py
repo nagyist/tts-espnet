@@ -33,27 +33,19 @@ class MultipleOptim(torch.optim.Optimizer):
     def state(self) -> Dict[str, torch.Tensor]:
         """Return the combined state for each optimizer in ``self.optimizers``."""
         return {
-            key: value
-            for optim in self.optims
-            for key, value in optim.state.items()
+            key: value for optim in self.optims for key, value in optim.state.items()
         }
 
     @property
     def param_groups(self) -> List[Dict[str, Union[torch.Tensor, float, bool, Any]]]:
         """Return the combined parameters for each optimizer in ``self.optimizers``."""
-        return [
-            element
-            for optim in self.optims
-            for element in optim.param_groups
-        ]
+        return [element for optim in self.optims for element in optim.param_groups]
 
     @property
     def defaults(self) -> Dict[str, torch.Tensor]:
         """Return the combined defaults for each optimizer in ``self.optimizers``."""
         return {
-            key: value
-            for optim in self.optims
-            for key, value in optim.defaults.items()
+            key: value for optim in self.optims for key, value in optim.defaults.items()
         }
 
     def __getstate__(self) -> List[torch.optim.Optimizer]:

@@ -310,7 +310,7 @@ class ESPnetLightningModule(lightning.LightningModule):
 
                 optim = instantiate(
                     OmegaConf.to_container(optim_config["optim"], resolve=True),
-                    selected
+                    selected,
                 )
                 optims.append(optim)
 
