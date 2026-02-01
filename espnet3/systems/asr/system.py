@@ -11,7 +11,7 @@ from importlib import import_module
 from pathlib import Path
 from typing import Iterable
 
-from espnet3.systems.asr.tokenizer.sentencepiece import train_sentencepiece
+from espnet3.systems.asr.tokenizers.sentencepiece import train_sentencepiece
 from espnet3.systems.base.system import BaseSystem
 
 logger = logging.getLogger(__name__)
