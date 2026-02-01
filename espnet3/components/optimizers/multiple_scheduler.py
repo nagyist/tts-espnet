@@ -8,7 +8,7 @@ from typing import Any
 import torch
 from typeguard import typechecked
 
-from espnet3.components.optim.multiple_optim import MultipleOptim
+from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 
 
 class MultipleScheduler(torch.optim.lr_scheduler._LRScheduler):
@@ -18,7 +18,7 @@ class MultipleScheduler(torch.optim.lr_scheduler._LRScheduler):
     https://github.com/Lightning-AI/lightning/issues/3346#issuecomment-1036063687
 
     Args:
-        multiple_optim: MultipleOptim
+        multiple_optim: MultipleOptimizer
         lr_scheduler: torch.optim.lr_scheduler._LRScheduler
         optim_idx: int
             Index of the optimizer in ``multiple_optim`` the learning rate scheduler
@@ -29,16 +29,16 @@ class MultipleScheduler(torch.optim.lr_scheduler._LRScheduler):
     @typechecked
     def __init__(
         self,
-        multiple_optim: MultipleOptim,
+        multiple_optimizer: MultipleOptimizer,
         lr_scheduler: torch.optim.lr_scheduler.LRScheduler,
         optim_idx: int,
     ) -> None:
         """Initialize MultipleScheduler object."""
-        assert 0 <= optim_idx < len(multiple_optim.optims), (
+        assert 0 <= optim_idx < len(multiple_optimizer.optimizers), (
             f"optim_idx {optim_idx} is out of range for "
-            f"multiple_optim with {len(multiple_optim.optims)} optimizers."
+            f"multiple_optim with {len(multiple_optimizer.optimizers)} optimizers."
         )
-        self.optimizer = multiple_optim
+        self.optimizer = multiple_optimizer
         self.lr_scheduler = lr_scheduler
         self.idx = optim_idx
 
