@@ -13,10 +13,10 @@ import time
 from pathlib import Path
 
 import numpy as np
+import soundfile as sf
 import torch
 import torch.multiprocessing as mp
 import yaml
-import soundfile as sf
 
 from espnet2.speechlm.dataloader.iterator import DataIteratorFactory
 from espnet2.speechlm.model import _all_job_types
