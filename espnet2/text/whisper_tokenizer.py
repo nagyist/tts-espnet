@@ -94,7 +94,7 @@ class OpenAIWhisperTokenizer(AbsTokenizer):
                 dict(additional_special_tokens=timestamps + sc)
             )
         else:
-            # For transformer >= V5 
+            # For transformer >= V5
             self.tokenizer.tokenizer.add_special_tokens(
                 dict(extra_special_tokens=timestamps + sc)
             )
