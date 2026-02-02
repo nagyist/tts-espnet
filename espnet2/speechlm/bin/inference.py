@@ -221,7 +221,7 @@ def inference_worker(
                 audio, length = audio[0], length[0]
                 audio = audio.cpu().float().numpy()
 
-                content = output_dir / f"{example_id}_segment{idx+1}.wav"
+                content = output_dir / f"{example_id}_segment{idx + 1}.wav"
                 sf.write(content, audio.T, sample_rate)
 
                 messages[idx][2] = str(content)
