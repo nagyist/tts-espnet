@@ -86,9 +86,8 @@ class OpenAIWhisperTokenizer(AbsTokenizer):
         # Whisper uses discrete tokens (20ms) to encode timestamp
         timestamps = [f"<|{i * 0.02:.2f}|>" for i in range(0, 1501)]
         sc = [speaker_change_symbol] if sot else []
-        special_tokens = self.tokenizer.tokenizer.extra_special_tokens + timestamps + sc
         self.tokenizer.tokenizer.add_special_tokens(
-            dict(extra_special_tokens=special_tokens)
+            dict(extra_special_tokens=timestamps + sc)
         )
 
     def __repr__(self):
