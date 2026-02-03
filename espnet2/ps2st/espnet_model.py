@@ -16,6 +16,7 @@ try:
         AutoProcessor,
         Qwen2AudioForConditionalGeneration,
     )
+
     is_transformers_available = True
 except ImportError:
     is_transformers_available = False
