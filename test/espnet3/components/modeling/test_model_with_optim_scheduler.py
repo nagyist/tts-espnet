@@ -3,10 +3,10 @@ import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
 
-from espnet3.components.modeling.model import LitESPnetModel
+from espnet3.components.modeling.lightning_module import ESPnetLightningModule
 
 # ===============================================================
-# Test Case Summary for LitESPnetModel.configure_optimizers
+# Test Case Summary for ESPnetLightningModule.configure_optimizers
 # ===============================================================
 #
 # Valid Configuration Tests
@@ -38,7 +38,7 @@ class DummyModel(nn.Module):
         self.linear2 = nn.Linear(10, 5)
 
 
-class ReduceLROnPlateauModel(LitESPnetModel):
+class ReduceLROnPlateauModel(ESPnetLightningModule):
     def __init__(self, model, config):
         super().__init__(model, config)
         self.favorite_metric = 1.0
@@ -72,7 +72,7 @@ class ReduceLROnPlateauModel(LitESPnetModel):
 def test_single_optim_and_scheduler():
     config = OmegaConf.create(
         {
-            "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+            "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
             "scheduler": {
                 "_target_": "torch.optim.lr_scheduler.StepLR",
                 "step_size": 10,
@@ -86,7 +86,7 @@ def test_single_optim_and_scheduler():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     out = model.configure_optimizers()
     assert "optimizer" in out
     assert "lr_scheduler" in out
@@ -95,13 +95,13 @@ def test_single_optim_and_scheduler():
 def test_multiple_optims_and_schedulers():
     config = OmegaConf.create(
         {
-            "optims": [
+            "optimizers": [
                 {
-                    "optim": {"_target_": "torch.optim.SGD", "lr": 0.01},
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.01},
                     "params": "linear1",
                 },
                 {
-                    "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+                    "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
                     "params": "linear2",
                 },
             ],
@@ -128,7 +128,7 @@ def test_multiple_optims_and_schedulers():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     out = model.configure_optimizers()
     assert hasattr(out["optimizer"], "optimizers")  # HybridOptim
     assert isinstance(out["lr_scheduler"]["scheduler"], list)
@@ -137,7 +137,7 @@ def test_multiple_optims_and_schedulers():
 def test_custom_scheduler_interval():
     config = OmegaConf.create(
         {
-            "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+            "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
             "scheduler": {
                 "_target_": "torch.optim.lr_scheduler.StepLR",
                 "step_size": 5,
@@ -151,7 +151,7 @@ def test_custom_scheduler_interval():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     out = model.configure_optimizers()
     assert out["lr_scheduler"]["interval"] == "step"
 
@@ -159,7 +159,7 @@ def test_custom_scheduler_interval():
 def test_reduce_on_plateau_with_config_adam():
     config = OmegaConf.create(
         {
-            "optim": {"_target_": "torch.optim.Adam", "lr": 0.01},
+            "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.01},
             "scheduler": {
                 "_target_": "torch.optim.lr_scheduler.ReduceLROnPlateau",
                 "patience": 1,
@@ -207,10 +207,10 @@ def test_missing_both_optim_and_optims():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     with pytest.raises(
         ValueError,
-        match="Must specify either `optim` or `optims` and `scheduler` or"
+        match="Must specify either `optimizer` or `optimizers` and `scheduler` or"
         "`schedulers`",
     ):
         model.configure_optimizers()
@@ -219,10 +219,10 @@ def test_missing_both_optim_and_optims():
 def test_mixed_optim_and_optims():
     config = OmegaConf.create(
         {
-            "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
-            "optims": [
+            "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
+            "optimizers": [
                 {
-                    "optim": {"_target_": "torch.optim.SGD", "lr": 0.01},
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.01},
                     "params": "linear1",
                 }
             ],
@@ -238,9 +238,9 @@ def test_mixed_optim_and_optims():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     with pytest.raises(
-        AssertionError, match="Mixture of `optim` and `optims` is not allowed"
+        AssertionError, match="Mixture of `optimizer` and `optimizers` is not allowed"
     ):
         model.configure_optimizers()
 
@@ -248,7 +248,7 @@ def test_mixed_optim_and_optims():
 def test_mixed_scheduler_and_schedulers():
     config = OmegaConf.create(
         {
-            "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+            "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
             "scheduler": {
                 "_target_": "torch.optim.lr_scheduler.StepLR",
                 "step_size": 10,
@@ -270,7 +270,7 @@ def test_mixed_scheduler_and_schedulers():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     with pytest.raises(
         AssertionError, match="Mixture of `scheduler` and `schedulers` is not allowed"
     ):
@@ -280,13 +280,13 @@ def test_mixed_scheduler_and_schedulers():
 def test_optims_and_schedulers_length_mismatch():
     config = OmegaConf.create(
         {
-            "optims": [
+            "optimizers": [
                 {
-                    "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+                    "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
                     "params": "linear1",
                 },
                 {
-                    "optim": {"_target_": "torch.optim.SGD", "lr": 0.01},
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.01},
                     "params": "linear2",
                 },
             ],
@@ -307,7 +307,7 @@ def test_optims_and_schedulers_length_mismatch():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     with pytest.raises(
         AssertionError, match="The number of optimizers and schedulers must be equal"
     ):
@@ -317,8 +317,8 @@ def test_optims_and_schedulers_length_mismatch():
 def test_optimizer_missing_params_key():
     config = OmegaConf.create(
         {
-            "optims": [
-                {"optim": {"_target_": "torch.optim.SGD", "lr": 0.01}}
+            "optimizers": [
+                {"optimizer": {"_target_": "torch.optim.SGD", "lr": 0.01}}
             ],  # Missing "params"
             "schedulers": [
                 {
@@ -337,17 +337,17 @@ def test_optimizer_missing_params_key():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
-    with pytest.raises(AssertionError, match="missing 'params' in optim config"):
+    model = ESPnetLightningModule(DummyModel(), config)
+    with pytest.raises(AssertionError, match="missing 'params' in optimizer config"):
         model.configure_optimizers()
 
 
 def test_optimizer_params_not_matching_model():
     config = OmegaConf.create(
         {
-            "optims": [
+            "optimizers": [
                 {
-                    "optim": {"_target_": "torch.optim.SGD", "lr": 0.01},
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.01},
                     "params": "does_not_exist",
                 }
             ],
@@ -368,7 +368,7 @@ def test_optimizer_params_not_matching_model():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     with pytest.raises(AssertionError, match="No trainable parameters found for"):
         model.configure_optimizers()
 
@@ -376,13 +376,13 @@ def test_optimizer_params_not_matching_model():
 def test_optimizer_duplicate_params():
     config = OmegaConf.create(
         {
-            "optims": [
+            "optimizers": [
                 {
-                    "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+                    "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
                     "params": "linear",  # matches both linear1 and linear2
                 },
                 {
-                    "optim": {"_target_": "torch.optim.SGD", "lr": 0.01},
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.01},
                     "params": "linear",  # same
                 },
             ],
@@ -409,7 +409,7 @@ def test_optimizer_duplicate_params():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(DummyModel(), config)
+    model = ESPnetLightningModule(DummyModel(), config)
     with pytest.raises(
         AssertionError,
         match="Parameter model.linear1.weight is assigned to multiple optimizers",
@@ -429,9 +429,9 @@ def test_optimizer_missing_coverage():
 
     config = OmegaConf.create(
         {
-            "optims": [
+            "optimizers": [
                 {
-                    "optim": {"_target_": "torch.optim.Adam", "lr": 0.001},
+                    "optimizer": {"_target_": "torch.optim.Adam", "lr": 0.001},
                     "params": "linear1",
                 }
             ],
@@ -452,7 +452,7 @@ def test_optimizer_missing_coverage():
             "num_device": 1,
         }
     )
-    model = LitESPnetModel(PartialModel(), config)
+    model = ESPnetLightningModule(PartialModel(), config)
     with pytest.raises(AssertionError) as excinfo:
         model.configure_optimizers()
     assert "model.linear2.bias" in str(excinfo.value)

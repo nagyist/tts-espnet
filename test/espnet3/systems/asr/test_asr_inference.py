@@ -1,7 +1,49 @@
 import pytest
 from omegaconf import OmegaConf
 
-import espnet3.systems.asr.inference as asr_infer
+from espnet3.systems.base.inference import infer
+from espnet3.systems.base.inference_provider import InferenceProvider
+from espnet3.systems.base.inference_runner import InferenceRunner
+
+
+def _output_fn(*, data, model_output, idx):
+    return {"uttid": data["uttid"], "hyp": model_output[0][0], "ref": data["text"]}
+
+
+def _batch_output_fn(*, data, model_output, idx):
+    return [
+        {
+            "uttid": sample["uttid"],
+            "hyp": output[0][0],
+            "ref": sample["text"],
+        }
+        for sample, output in zip(data, model_output)
+    ]
+
+
+def _param_output_fn(*, data, model_output, idx):
+    return {"uttid": data["uttid"], "hyp": model_output, "ref": "ref"}
+
+
+class DummyProvider(InferenceProvider):
+    @staticmethod
+    def build_dataset(config):
+        return config.dataset.data
+
+    @staticmethod
+    def build_model(config):
+        def model(speech):
+            return f"base-{speech}"
+
+        return model
+
+
+class ParamRunner(InferenceRunner):
+    @staticmethod
+    def forward(idx, *, dataset=None, model=None, flip=False, **kwargs):
+        output = InferenceRunner.forward(idx, dataset=dataset, model=model, **kwargs)
+        output["hyp"] = "flip" if flip else "base"
+        return output
 
 
 def test_build_dataset_uses_test_set(monkeypatch):
@@ -13,9 +55,11 @@ def test_build_dataset_uses_test_set(monkeypatch):
         calls["obj"] = obj
         return organizer
 
-    monkeypatch.setattr(asr_infer, "instantiate", fake_instantiate)
+    monkeypatch.setattr(
+        "espnet3.systems.base.inference_provider.instantiate", fake_instantiate
+    )
 
-    dataset = asr_infer.InferenceProvider.build_dataset(cfg)
+    dataset = InferenceProvider.build_dataset(cfg)
 
     assert dataset == ["item"]
     assert calls["obj"] == cfg.dataset
@@ -25,16 +69,18 @@ def test_build_model_cpu(monkeypatch):
     cfg = OmegaConf.create({"model": {"_target_": "dummy.Model"}})
     calls = {}
 
-    monkeypatch.setattr(asr_infer.torch.cuda, "is_available", lambda: False)
+    import espnet3.systems.base.inference_provider as provider_mod
+
+    monkeypatch.setattr(provider_mod.torch.cuda, "is_available", lambda: False)
 
     def fake_instantiate(obj, device=None):
         calls["device"] = device
         calls["obj"] = obj
         return "model"
 
-    monkeypatch.setattr(asr_infer, "instantiate", fake_instantiate)
+    monkeypatch.setattr(provider_mod, "instantiate", fake_instantiate)
 
-    assert asr_infer.InferenceProvider.build_model(cfg) == "model"
+    assert InferenceProvider.build_model(cfg) == "model"
     assert calls["device"] == "cpu"
     assert calls["obj"] == cfg.model
 
@@ -43,37 +89,147 @@ def test_build_model_cuda_uses_visible_device(monkeypatch):
     cfg = OmegaConf.create({"model": {"_target_": "dummy.Model"}})
     calls = {}
 
-    monkeypatch.setattr(asr_infer.torch.cuda, "is_available", lambda: True)
+    import espnet3.systems.base.inference_provider as provider_mod
+
+    monkeypatch.setattr(provider_mod.torch.cuda, "is_available", lambda: True)
 
     def fake_instantiate(obj, device=None):
         calls["device"] = device
         return "model"
 
-    monkeypatch.setattr(asr_infer, "instantiate", fake_instantiate)
+    monkeypatch.setattr(provider_mod, "instantiate", fake_instantiate)
     monkeypatch.setenv("CUDA_VISIBLE_DEVICES", "2,3")
 
-    assert asr_infer.InferenceProvider.build_model(cfg) == "model"
+    assert InferenceProvider.build_model(cfg) == "model"
     assert calls["device"] == "cuda:2"
 
 
 def test_forward_returns_hyp_and_ref():
-    dataset = [{"speech": "audio", "text": "ref"}]
+    dataset = [{"uttid": "utt1", "speech": "audio", "text": "ref"}]
 
     class DummyModel:
         def __call__(self, speech):
             assert speech == "audio"
             return [["hyp"]]
 
-    out = asr_infer.InferenceRunner.forward(0, dataset=dataset, model=DummyModel())
+    output_path = f"{__name__}._output_fn"
+    out = InferenceRunner.forward(
+        0,
+        dataset=dataset,
+        model=DummyModel(),
+        input_key="speech",
+        output_fn_path=output_path,
+    )
 
-    assert out == {"idx": 0, "hyp": "hyp", "ref": "ref"}
+    assert out == {"uttid": "utt1", "hyp": "hyp", "ref": "ref"}
+
+
+def test_forward_batch_with_batched_inputs():
+    dataset = [
+        {"uttid": "utt1", "speech": "audio1", "text": "ref1"},
+        {"uttid": "utt2", "speech": "audio2", "text": "ref2"},
+    ]
+
+    class DummyModel:
+        def __call__(self, **inputs):
+            assert inputs == {"speech": ["audio1", "audio2"]}
+            return [[["hyp1"]], [["hyp2"]]]
+
+    output_path = f"{__name__}._batch_output_fn"
+    out = InferenceRunner.forward(
+        [0, 1],
+        dataset=dataset,
+        model=DummyModel(),
+        input_key="speech",
+        output_fn_path=output_path,
+    )
+
+    assert out == [
+        {"uttid": "utt1", "hyp": "hyp1", "ref": "ref1"},
+        {"uttid": "utt2", "hyp": "hyp2", "ref": "ref2"},
+    ]
+
+
+def test_forward_batch_requires_batched_model():
+    dataset = [
+        {"uttid": "utt1", "speech": "audio1", "text": "ref1"},
+        {"uttid": "utt2", "speech": "audio2", "text": "ref2"},
+    ]
+
+    class DummyModel:
+        def __call__(self, speech):
+            return [[f"hyp-{speech}"]]
+
+    output_path = f"{__name__}._output_fn"
+    with pytest.raises(RuntimeError, match="Batched inference failed"):
+        InferenceRunner.forward(
+            [0, 1],
+            dataset=dataset,
+            model=DummyModel(),
+            input_key="speech",
+            output_fn_path=output_path,
+        )
 
 
 def test_forward_requires_fields():
     dataset = [{"text": "ref"}]
-    with pytest.raises(AssertionError, match="requires 'speech'"):
-        asr_infer.InferenceRunner.forward(0, dataset=dataset, model=lambda x: [["hyp"]])
+    with pytest.raises(KeyError, match="Input key 'speech'"):
+        InferenceRunner.forward(
+            0,
+            dataset=dataset,
+            model=lambda **kwargs: [["hyp"]],
+            input_key="speech",
+            output_fn_path=f"{__name__}._output_fn",
+        )
 
-    dataset = [{"speech": "audio"}]
-    with pytest.raises(AssertionError, match="requires 'text'"):
-        asr_infer.InferenceRunner.forward(0, dataset=dataset, model=lambda x: [["hyp"]])
+    dataset = [{"uttid": "utt1", "speech": "audio"}]
+    with pytest.raises(KeyError, match="text"):
+        InferenceRunner.forward(
+            0,
+            dataset=dataset,
+            model=lambda **kwargs: [["hyp"]],
+            input_key="speech",
+            output_fn_path=f"{__name__}._output_fn",
+        )
+
+
+def test_inference_requires_provider_config():
+    cfg = OmegaConf.create(
+        {
+            "inference_dir": "unused",
+            "dataset": {"test": [{"name": "test"}]},
+            "input_key": "speech",
+            "output_fn": f"{__name__}._output_fn",
+            "runner": {"_target_": f"{__name__}.ParamRunner"},
+            "parallel": {"env": "local", "n_workers": 1},
+        }
+    )
+    with pytest.raises(RuntimeError, match="infer_config.provider must be set"):
+        infer(cfg)
+
+
+@pytest.mark.parametrize("flip,expected", [(False, "base"), (True, "flip")])
+def test_inference_params_affect_runner_forward(tmp_path, flip, expected):
+    cfg = OmegaConf.create(
+        {
+            "inference_dir": str(tmp_path),
+            "dataset": {
+                "test": [{"name": "test"}],
+                "data": [{"uttid": "utt1", "speech": "s1"}],
+            },
+            "input_key": "speech",
+            "output_fn": f"{__name__}._param_output_fn",
+            "provider": {
+                "_target_": f"{__name__}.DummyProvider",
+                "params": {"flip": flip},
+            },
+            "runner": {"_target_": f"{__name__}.ParamRunner"},
+            "parallel": {"env": "local", "n_workers": 1},
+        }
+    )
+
+    infer(cfg)
+
+    scp_path = tmp_path / "test" / "hyp.scp"
+    assert scp_path.exists()
+    assert scp_path.read_text().strip() == f"utt1 {expected}"

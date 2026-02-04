@@ -107,7 +107,7 @@ class CombinedDataset:
                     " then all dataset should be a subclass of ShardedDataset."
                 )
 
-        # This flag will be overrode by LitESPnetModel when initializing dataloader.
+        # This flag will be overrode by ESPnetLightningModule.
         self._use_espnet_collator = False
 
     @property
@@ -236,7 +236,7 @@ class DatasetWithTransform:
         ...         "text": sample["text"].upper()
         ...     }
         >>>
-        >>> def preprocessor(uid, sample):
+        >>> def preprocess(uid, sample):
         ...     return {
         ...         "text": f"[uid={uid}] " + sample["text"]
         ...     }
@@ -244,7 +244,7 @@ class DatasetWithTransform:
         >>> wrapped = DatasetWithTransform(
         ...     my_dataset,
         ...     transform,
-        ...     preprocessor,
+        ...     preprocess,
         ...     use_espnet_preprocessor=True
         ... )
         >>> uid_sample = wrapped[0]
