@@ -51,24 +51,27 @@ def run_stages(
         if fn is None:
             raise AttributeError(f"System has no stage method: {stage}")
 
-        if dry_run:
-            log.info("[DRY RUN] would run stage: %s", stage)
-            continue
+        from espnet3.utils.logging_utils import log_stage
 
-        start = time.perf_counter()
-        log.info("=== [START] stage: %s ===", stage)
-        try:
-            fn()
-        except TypeError as e:
-            log.exception("Stage '%s' failed (bad arguments)", stage)
-            raise TypeError(
-                f"Stage '{stage}' does not accept CLI arguments; "
-                "put all settings in the YAML config."
-            ) from e
-        except Exception:
-            elapsed = time.perf_counter() - start
-            log.exception("Stage '%s' failed after %.2fs", stage, elapsed)
-            raise
-        else:
-            elapsed = time.perf_counter() - start
-            log.info("=== [DONE] stage: %s (%.2fs) ===", stage, elapsed)
+        with log_stage(stage):
+            if dry_run:
+                log.info("[DRY RUN] would run stage: %s", stage)
+                continue
+
+            start = time.perf_counter()
+            log.info("=== [START] stage: %s ===", stage)
+            try:
+                fn()
+            except TypeError as e:
+                log.exception("Stage '%s' failed (bad arguments)", stage)
+                raise TypeError(
+                    f"Stage '{stage}' does not accept CLI arguments; "
+                    "put all settings in the YAML config."
+                ) from e
+            except Exception:
+                elapsed = time.perf_counter() - start
+                log.exception("Stage '%s' failed after %.2fs", stage, elapsed)
+                raise
+            else:
+                elapsed = time.perf_counter() - start
+                log.info("=== [DONE] stage: %s (%.2fs) ===", stage, elapsed)
