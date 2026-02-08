@@ -41,9 +41,11 @@ def test_train_batch_metrics_logger_logs_without_training(caplog):
         callback.on_train_batch_end(
             trainer, model, outputs=None, batch=batch, batch_idx=0
         )
+        callback.on_train_epoch_end(trainer, model)
 
     text = caplog.text
     assert "1epoch:train:1-1batch" in text
+    assert "epoch_summary:1epoch:train:" in text
     assert re.search(r"acc=0\.25\b", text)
     assert re.search(r"loss=2\b", text)
     assert re.search(r"optim0_lr0=0\.02\b", text)

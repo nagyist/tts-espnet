@@ -17,6 +17,7 @@ from shutil import which
 from typing import Iterable, Mapping
 
 from humanfriendly import format_number, format_size
+from espnet2.samplers.abs_sampler import AbsSampler
 
 try:
     import torch
@@ -1048,6 +1049,23 @@ def log_dataloader(
         )
 
     if batches is not None:
+        if isinstance(batches, AbsSampler):
+            _log(
+                logger,
+                logging.INFO,
+                "IterBatches[%s] class: %s",
+                label,
+                _qualified_name(batches),
+                stacklevel=2,
+            )
+            _log(
+                logger,
+                logging.INFO,
+                "IterBatches[%s]: %s",
+                label,
+                batches,
+                stacklevel=2,
+            )
         try:
             batch_count = len(batches)
         except Exception:
