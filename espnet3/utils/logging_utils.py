@@ -9,15 +9,14 @@ import shlex
 import socket
 import subprocess
 import sys
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from shutil import which
-from typing import Iterable, Mapping
+from typing import Mapping
 
 from humanfriendly import format_number, format_size
-
-from espnet2.samplers.abs_sampler import AbsSampler
 
 try:
     import torch
@@ -31,6 +30,7 @@ LOG_FORMAT = (
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
 _LOG_STAGE = contextvars.ContextVar("espnet3_log_stage", default="main")
+_LOGGED_DATALOADER: bool = False
 _BASE_RECORD_FACTORY = logging.getLogRecordFactory()
 
 
@@ -586,10 +586,6 @@ def _iter_attrs(obj) -> Iterable[tuple[str, object]]:
     )
 
 
-def _is_iterable_but_not_str(value) -> bool:
-    return isinstance(value, Iterable) and not isinstance(value, (str, bytes))
-
-
 def _is_leaf_value(value) -> bool:
     return isinstance(value, (str, bytes, int, float, bool, Path)) or value is None
 
@@ -597,6 +593,18 @@ def _is_leaf_value(value) -> bool:
 def _has_custom_repr(obj) -> bool:
     obj_repr = obj.__class__.__repr__
     return obj_repr is not object.__repr__
+
+
+def _summarize_iter_item(item) -> str:
+    if _has_custom_repr(item):
+        return str(item)
+    return _summarize_value(item)
+
+
+def _truncate_text(text: str, *, max_len: int = 200) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3] + "..."
 
 
 def _dump_attrs(
@@ -607,7 +615,6 @@ def _dump_attrs(
     depth: int,
     max_depth: int,
     seen: set[int],
-    skip_custom_repr: bool = False,
 ) -> None:
     if depth > max_depth:
         _log(logger, logging.INFO, "%s...", indent, stacklevel=3)
@@ -617,10 +624,6 @@ def _dump_attrs(
         _log(logger, logging.INFO, "%s<recursive>", indent, stacklevel=3)
         return
     seen.add(obj_id)
-
-    if _has_custom_repr(obj) and not skip_custom_repr:
-        _log(logger, logging.INFO, "%s%s", indent, obj, stacklevel=3)
-        return
 
     for key, value in _iter_attrs(obj):
         if isinstance(value, torch.nn.Module):
@@ -634,35 +637,14 @@ def _dump_attrs(
                 stacklevel=3,
             )
             continue
-        if key == "batches":
+        if isinstance(value, Iterator):
             _log(
                 logger,
                 logging.INFO,
                 "%s%s: %s",
                 indent,
                 key,
-                value,
-                stacklevel=3,
-            )
-            continue
-        if _is_iterable_but_not_str(value):
-            items = []
-            try:
-                for item in value:
-                    items.append(_summarize_value(item))
-            except Exception:
-                items = None
-            if items is None:
-                rendered = _qualified_name(value)
-            else:
-                rendered = "[" + ", ".join(items) + "]"
-            _log(
-                logger,
-                logging.INFO,
-                "%s%s: %s",
-                indent,
-                key,
-                rendered,
+                _truncate_text(str(value)),
                 stacklevel=3,
             )
             continue
@@ -693,7 +675,6 @@ def _dump_attrs(
             depth=depth + 1,
             max_depth=max_depth,
             seen=seen,
-            skip_custom_repr=True,
         )
 
 
@@ -926,6 +907,10 @@ def log_dataloader(
     batches=None,
 ) -> None:
     """Log dataloader/iterator details including samplers and iter factories."""
+    global _LOGGED_DATALOADER
+    if _LOGGED_DATALOADER:
+        return
+    _LOGGED_DATALOADER = True
     if hasattr(loader, "dataset") and hasattr(loader, "batch_size"):
         dataset = getattr(loader, "dataset", None)
         try:
@@ -1055,27 +1040,18 @@ def log_dataloader(
         )
 
     if batches is not None:
-        if isinstance(batches, AbsSampler):
-            _log(
-                logger,
-                logging.INFO,
-                "IterBatches[%s] class: %s",
-                label,
-                _qualified_name(batches),
-                stacklevel=2,
-            )
-            _log(
-                logger,
-                logging.INFO,
-                "IterBatches[%s]: %s",
-                label,
-                batches,
-                stacklevel=2,
-            )
         try:
             batch_count = len(batches)
         except Exception:
             batch_count = None
+        _log(
+            logger,
+            logging.INFO,
+            "IterBatches[%s]: %s",
+            label,
+            _truncate_text(str(batches)),
+            stacklevel=2,
+        )
         if batch_count is not None:
             _log(
                 logger,
@@ -1085,16 +1061,3 @@ def log_dataloader(
                 batch_count,
                 stacklevel=2,
             )
-            if batch_count:
-                try:
-                    first_batch = batches[0]
-                    _log(
-                        logger,
-                        logging.INFO,
-                        "IterBatches[%s]: first batch size=%s",
-                        label,
-                        len(first_batch),
-                        stacklevel=2,
-                    )
-                except Exception:
-                    pass

@@ -13,6 +13,7 @@ from espnet2.samplers.build_batch_sampler import build_batch_sampler
 from espnet3.utils.logging_utils import log_dataloader
 
 logger = logging.getLogger(__name__)
+_LOGGED_DISTRIBUTED_BATCHES: set[str] = set()
 
 
 def update_shard(config: Union[dict, list], shard_idx: int) -> Union[dict, list]:
@@ -203,13 +204,25 @@ class DataLoaderBuilder:
             batches = list(batches)
             world_size = torch.distributed.get_world_size()
             rank = torch.distributed.get_rank()
+            total_batches = len(batches)
             for batch in batches:
                 if len(batch) < world_size:
                     raise RuntimeError(
                         "The batch-size must be equal or more than world_size:"
                         f"{len(batch)} < {world_size}"
                     )
-            batches = [batch[rank::world_size] for batch in batches]
+            batches = batches[rank::world_size]
+            if mode not in _LOGGED_DISTRIBUTED_BATCHES:
+                logger.info(
+                    "[%s] distributed batches: "
+                    + "world_size=%s, rank=%s, total=%s, per_rank=%s",
+                    mode,
+                    world_size,
+                    rank,
+                    total_batches,
+                    len(batches),
+                )
+                _LOGGED_DISTRIBUTED_BATCHES.add(mode)
 
         iter_factory = instantiate(factory_config, dataset, batches=batches)
         iterator = iter_factory.build_iter(self.epoch, shuffle=False)
