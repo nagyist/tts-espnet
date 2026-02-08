@@ -103,7 +103,6 @@ def test_log_run_metadata_logs_command_and_git(monkeypatch, tmp_path: Path):
         elog.log_run_metadata(
             logger,
             argv=["run.py", "--arg", "1"],
-            workdir=tmp_path,
             configs={"train": tmp_path / "train.yaml"},
         )
         out = stream.getvalue()
@@ -258,6 +257,9 @@ def test_log_dataloader_formats_human_readable():
     logger, stream, cleanup = _capture_logger("espnet3.test.dataloader")
     old_handlers, old_level, old_propagate, handler = cleanup
 
+    from espnet3 import utils as espnet3_utils
+
+    espnet3_utils.logging_utils._LOGGED_DATALOADER = False
     loader = torch.utils.data.DataLoader(DummyDataset(), batch_size=2, num_workers=0)
     try:
         elog.log_dataloader(logger, loader, label="train")

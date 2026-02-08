@@ -16,12 +16,11 @@ from pathlib import Path
 from shutil import which
 from typing import Mapping
 
+import torch
 from humanfriendly import format_number, format_size
 
-try:
-    import torch
-except Exception:  # pragma: no cover - optional dependency
-    torch = None
+from espnet3.components.data.dataset import CombinedDataset, DatasetWithTransform
+from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 
 LOG_FORMAT = (
     "[%(hostname)s] %(asctime)s (%(filename)s:%(lineno)d) "
@@ -29,24 +28,23 @@ LOG_FORMAT = (
 )
 DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 
+# =============================================================================
+# Logging Record Setup
+# =============================================================================
 _LOG_STAGE = contextvars.ContextVar("espnet3_log_stage", default="main")
 _LOGGED_DATALOADER: bool = False
 _BASE_RECORD_FACTORY = logging.getLogRecordFactory()
 
 
 def _record_factory(*args, **kwargs):
+    # Inject custom fields used by LOG_FORMAT (stage/hostname) into each LogRecord.
     record = _BASE_RECORD_FACTORY(*args, **kwargs)
     record.stage = _LOG_STAGE.get()
     record.hostname = socket.gethostname()
     return record
 
 
-def _ensure_log_record_factory() -> None:
-    if logging.getLogRecordFactory() is not _record_factory:
-        logging.setLogRecordFactory(_record_factory)
-
-
-_ensure_log_record_factory()
+logging.setLogRecordFactory(_record_factory)
 
 
 @contextmanager
@@ -59,17 +57,9 @@ def log_stage(name: str):
         _LOG_STAGE.reset(token)
 
 
-def _log(
-    logger: logging.Logger,
-    level: int,
-    msg: str,
-    *args,
-    stacklevel: int = 2,
-    **kwargs,
-) -> None:
-    logger.log(level, msg, *args, stacklevel=stacklevel, **kwargs)
-
-
+# =============================================================================
+# Logging Configuration (Handlers/Formatters)
+# =============================================================================
 def _next_rotated_log_path(target: Path) -> Path:
     """Return the next available rotated log path (e.g., run1.log)."""
     suffixes = target.suffixes
@@ -95,6 +85,8 @@ def configure_logging(
     This sets up:
       - A root logger with a stream handler (console).
       - An optional file handler at `log_dir/filename`.
+      - If `log_dir/filename` already exists, it is rotated to the next
+        available suffix (e.g., `run1.log`) and a fresh `run.log` is created.
       - Warning capture into the logging system.
 
     Example usage:
@@ -111,6 +103,13 @@ def configure_logging(
         2026-02-04 10:15:22 | INFO | espnet3 | hello
         ```
 
+    Example directory tree (when `log_dir/filename` already exists):
+        ```
+        exp/run1/
+        ├── run.log          # new logs (current run)
+        └── run1.log         # rotated older logs
+        ```
+
     Args:
         log_dir (Path | None): Directory to store the log file.
             If None, only console logging is configured.
@@ -123,7 +122,6 @@ def configure_logging(
     root = logging.getLogger()
     root.setLevel(level)
 
-    _ensure_log_record_factory()
     formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT)
 
     if not any(isinstance(h, logging.StreamHandler) for h in root.handlers):
@@ -152,6 +150,9 @@ def configure_logging(
     return logging.getLogger("espnet3")
 
 
+# =============================================================================
+# Run Metadata (Command/Git/Requirements)
+# =============================================================================
 def _run_git_command(cmd: list[str], cwd: Path | None) -> str | None:
     """Run a git command and return stdout, or None on failure."""
     try:
@@ -184,9 +185,6 @@ def get_git_metadata(cwd: Path | None = None) -> dict[str, str]:
             - "worktree": "clean", "dirty", or "unknown".
     """
     cwd = cwd or Path.cwd()
-    head = _run_git_command(["git", "rev-parse", "HEAD"], cwd)
-    branch = _run_git_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd)
-    short = _run_git_command(["git", "rev-parse", "--short", "HEAD"], cwd)
     status = _run_git_command(["git", "status", "--short"], cwd)
 
     dirty = "clean"
@@ -195,46 +193,33 @@ def get_git_metadata(cwd: Path | None = None) -> dict[str, str]:
     elif status:
         dirty = "dirty"
 
-    meta: dict[str, str] = {}
-    if head:
-        meta["commit"] = head
-    if short:
-        meta["short_commit"] = short
-    if branch:
-        meta["branch"] = branch
+    meta = {
+        "commit": _run_git_command(["git", "rev-parse", "HEAD"], cwd),
+        "short_commit": _run_git_command(["git", "rev-parse", "--short", "HEAD"], cwd),
+        "branch": _run_git_command(["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd),
+    }
     meta["worktree"] = dirty
     return meta
 
 
-def format_command(argv: Iterable[str] | None = None) -> str:
-    """Format command arguments into a shell-escaped string."""
-    argv = list(argv) if argv is not None else sys.argv
-    return " ".join(shlex.quote(str(a)) for a in argv)
-
-
-def _run_pip_freeze() -> str | None:
-    """Return `pip freeze` output, or None on failure."""
-    try:
+def _run_pip_freeze() -> str:
+    """Return dependency snapshot output."""
+    if which("uv") is not None:
         completed = subprocess.run(
-            [sys.executable, "-m", "pip", "freeze"],
+            ["uv", "pip", "freeze"],
             check=True,
             capture_output=True,
             text=True,
         )
         return completed.stdout.strip()
-    except Exception:
-        if which("uv") is None:
-            return None
-        try:
-            completed = subprocess.run(
-                ["uv", "pip", "freeze"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-            return completed.stdout.strip()
-        except Exception:
-            return None
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "pip", "freeze"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return completed.stdout.strip()
 
 
 def _get_log_dir_from_logger(logger: logging.Logger) -> Path | None:
@@ -259,28 +244,29 @@ def _write_requirements_snapshot(logger: logging.Logger) -> None:
     """Write a requirements snapshot alongside the configured log file."""
     log_dir = _get_log_dir_from_logger(logger)
     if log_dir is None:
-        _log(
-            logger,
+        logger.log(
             logging.WARNING,
             "Skipping requirements export: no file logger configured.",
+            stacklevel=2,
         )
         return
 
     requirements = _run_pip_freeze()
-    if requirements is None:
-        _log(logger, logging.WARNING, "Failed to export requirements via pip freeze.")
-        return
 
     target = log_dir / "requirements.txt"
     target.write_text(requirements + "\n", encoding="utf-8")
-    _log(logger, logging.INFO, "Wrote requirements snapshot: %s", target)
+    logger.log(
+        logging.INFO,
+        "Wrote requirements snapshot: %s",
+        target,
+        stacklevel=2,
+    )
 
 
 def log_run_metadata(
     logger: logging.Logger,
     *,
     argv: Iterable[str] | None = None,
-    workdir: Path | None = None,
     configs: Mapping[str, Path | None] | None = None,
     write_requirements: bool = False,
 ) -> None:
@@ -289,7 +275,7 @@ def log_run_metadata(
     Logged fields include:
       - Start timestamp.
       - Python executable and command-line arguments.
-      - Working directory.
+      - Working directory (current process directory).
       - Python version.
       - Config paths (if provided).
       - Git metadata (commit/branch/dirty), when available.
@@ -304,8 +290,7 @@ def log_run_metadata(
         log_run_metadata(
             logger,
             argv=["espnet3-train", "--config", "conf/train.yaml"],
-            workdir=Path("/home/user/espnet3"),
-            configs={"train": Path("conf/train.yaml")},
+        configs={"train": Path("conf/train.yaml")},
         )
         ```
 
@@ -326,39 +311,60 @@ def log_run_metadata(
     Args:
         logger (logging.Logger): Logger used to emit metadata.
         argv (Iterable[str] | None): Command arguments; defaults to sys.argv.
-        workdir (Path | None): Working directory to report.
         configs (Mapping[str, Path | None] | None): Named config paths to log.
         write_requirements (bool): If True, export pip freeze output to
             requirements.txt alongside the log file.
     """
     logger.info("=== ESPnet3 run started: %s ===", datetime.now().isoformat())
-    _log(
-        logger,
+    logger.log(
         logging.INFO,
         "=== ESPnet3 run started: %s ===",
         datetime.now().isoformat(),
+        stacklevel=2,
     )
-    _log(logger, logging.INFO, "Command: %s %s", sys.executable, format_command(argv))
-    _log(logger, logging.INFO, "Python: %s", sys.version.replace("\n", " "))
+    cmd_argv = list(argv) if argv is not None else sys.argv
+    cmd_text = " ".join(shlex.quote(str(a)) for a in cmd_argv)
+    logger.log(
+        logging.INFO,
+        "Command: %s %s",
+        sys.executable,
+        cmd_text,
+        stacklevel=2,
+    )
+    logger.log(
+        logging.INFO,
+        "Python: %s",
+        sys.version.replace("\n", " "),
+        stacklevel=2,
+    )
 
-    cwd = workdir or Path.cwd()
-    _log(logger, logging.INFO, "Working directory: %s", cwd)
+    cwd = Path.cwd()
+    logger.log(logging.INFO, "Working directory: %s", cwd, stacklevel=2)
 
     if configs:
         for name, path in configs.items():
             if path is None:
                 continue
-            _log(logger, logging.INFO, "%s config: %s", name, Path(path).resolve())
+            logger.log(
+                logging.INFO,
+                "%s config: %s",
+                name,
+                Path(path).resolve(),
+                stacklevel=2,
+            )
 
     git_info = get_git_metadata(cwd)
     if git_info:
         git_parts = [f"{k}={v}" for k, v in git_info.items()]
-        _log(logger, logging.INFO, "Git: %s", ", ".join(git_parts))
+        logger.log(logging.INFO, "Git: %s", ", ".join(git_parts), stacklevel=2)
 
     if write_requirements:
         _write_requirements_snapshot(logger)
 
 
+# =============================================================================
+# Environment Metadata (Cluster/Runtime/Torch)
+# =============================================================================
 def _collect_env(
     *,
     prefixes: Iterable[str] | None = None,
@@ -394,6 +400,46 @@ def log_env_metadata(
     The output includes two blocks:
       - Cluster environment variables (scheduler/runtime IDs).
       - Runtime environment variables (CUDA/NCCL/OMP/PATH, etc.).
+
+    Environment variables collected by default:
+
+    Cluster prefixes:
+    | Prefix | Purpose |
+    |---|---|
+    | `SLURM_` | Slurm job/step metadata (job id, task id, node info) |
+    | `PBS_` | PBS/Torque job metadata |
+    | `LSF_` | LSF job metadata |
+    | `SGE_` | SGE job metadata |
+    | `COBALT_` | Cobalt job metadata |
+    | `OMPI_` | Open MPI runtime metadata |
+    | `PMI_` | PMI (Process Management Interface) metadata |
+    | `MPI_` | MPI runtime metadata (generic prefix) |
+
+    Runtime prefixes:
+    | Prefix | Purpose |
+    |---|---|
+    | `NCCL_` | NCCL configuration (multi-GPU comms) |
+    | `CUDA_` | CUDA runtime configuration |
+    | `ROCM_` | ROCm runtime configuration |
+    | `OMP_` | OpenMP threading configuration |
+    | `MKL_` | Intel MKL configuration |
+    | `OPENBLAS_` | OpenBLAS configuration |
+    | `UCX_` | UCX communication configuration |
+    | `NVIDIA_` | NVIDIA runtime configuration |
+
+    Explicit runtime keys:
+    | Key | Purpose |
+    |---|---|
+    | `PATH` | Executable search path |
+    | `PYTHONPATH` | Python module search path |
+    | `LD_LIBRARY_PATH` | Shared library search path |
+    | `CUDA_VISIBLE_DEVICES` | GPU visibility mask |
+    | `RANK` | Global rank (distributed) |
+    | `LOCAL_RANK` | Local rank on node |
+    | `NODE_RANK` | Node rank in job |
+    | `WORLD_SIZE` | Total process count |
+    | `MASTER_ADDR` | Distributed master address |
+    | `MASTER_PORT` | Distributed master port |
 
     Example usage:
         ```python
@@ -460,20 +506,15 @@ def log_env_metadata(
     cluster_dump = "\n".join(f"{k}={v}" for k, v in cluster_env.items()) or "(none)"
     runtime_dump = "\n".join(f"{k}={v}" for k, v in runtime_env.items()) or "(none)"
     logger.info("Cluster env:\n%s", cluster_dump)
-    _log(logger, logging.INFO, "Cluster env:\n%s", cluster_dump)
-    _log(logger, logging.INFO, "Runtime env:\n%s", runtime_dump)
-
-    if torch is None:
-        _log(logger, logging.INFO, "PyTorch: unavailable")
-        return
+    logger.log(logging.INFO, "Cluster env:\n%s", cluster_dump, stacklevel=2)
+    logger.log(logging.INFO, "Runtime env:\n%s", runtime_dump, stacklevel=2)
 
     try:
         cudnn_version = torch.backends.cudnn.version()
     except Exception:
         cudnn_version = None
 
-    _log(
-        logger,
+    logger.log(
         logging.INFO,
         "PyTorch: version=%s, cuda.available=%s, cudnn.version=%s, "
         "cudnn.benchmark=%s, cudnn.deterministic=%s",
@@ -482,96 +523,35 @@ def log_env_metadata(
         cudnn_version,
         torch.backends.cudnn.benchmark,
         torch.backends.cudnn.deterministic,
+        stacklevel=2,
     )
 
 
-def _format_param_count(value: int) -> str:
-    if value >= 1_000_000_000:
-        return f"{value / 1_000_000_000:.2f} B"
-    if value >= 1_000_000:
-        return f"{value / 1_000_000:.2f} M"
-    if value >= 1_000:
-        return f"{value / 1_000:.2f} K"
-    return format_number(value)
-
-
-def _format_size(num_bytes: int) -> str:
-    return format_size(num_bytes)
-
-
-def _collect_param_name_map(model) -> dict[int, str]:
-    return {id(p): name for name, p in model.named_parameters()}
-
-
-def _summarize_param_modules(model, params: Iterable) -> str | None:
-    try:
-        param_name_map = _collect_param_name_map(model)
-    except Exception:
-        return None
-
-    counts: dict[str, int] = {}
-    total = 0
-    for p in params:
-        numel = int(getattr(p, "numel", lambda: 0)())
-        total += numel
-        name = param_name_map.get(id(p))
-        if not name:
-            key = "unknown"
-        else:
-            key = name.split(".", 1)[0]
-        counts[key] = counts.get(key, 0) + numel
-
-    if total == 0:
-        return None
-
-    items = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
-    parts = [f"{k}({v / total * 100:.1f}%)" for k, v in items]
-    return ", ".join(parts)
-
-
+# =============================================================================
+# Introspection Helpers
+# =============================================================================
 def _qualified_name(obj) -> str:
+    """Return fully-qualified class name for an object or class.
+
+    Example:
+        ```python
+        _qualified_name(Path("/tmp"))
+        # => 'pathlib.PosixPath'
+        ```
+    """
     cls = obj if isinstance(obj, type) else type(obj)
     return f"{cls.__module__}.{cls.__name__}"
 
 
-def _summarize_value(value) -> str:
-    if value is None:
-        return "None"
-    if isinstance(value, (str, int, float, bool)):
-        return repr(value)
-    if isinstance(value, Path):
-        return repr(str(value))
-    if isinstance(value, (list, tuple)):
-        parts = []
-        for item in value:
-            if isinstance(item, (str, int, float, bool)):
-                parts.append(repr(item))
-            elif isinstance(item, Path):
-                parts.append(repr(str(item)))
-            else:
-                parts.append(_qualified_name(item))
-        return f"[{', '.join(parts)}]"
-    if isinstance(value, dict):
-        items = []
-        for k, v in value.items():
-            items.append(f"{k}={_summarize_value(v)}")
-        return "{" + ", ".join(items) + "}"
-    return _qualified_name(value)
-
-
-def _summarize_attrs(obj) -> str:
-    if not hasattr(obj, "__dict__"):
-        return ""
-    items = []
-    for key in sorted(obj.__dict__.keys()):
-        value = obj.__dict__[key]
-        if key.startswith("_"):
-            continue
-        items.append(f"{key}={_summarize_value(value)}")
-    return ", ".join(items)
-
-
 def _callable_name(fn) -> str:
+    """Return fully-qualified callable name when possible.
+
+    Example:
+        ```python
+        _callable_name(len)
+        # => 'builtins.len'
+        ```
+    """
     if hasattr(fn, "__module__") and hasattr(fn, "__name__"):
         return f"{fn.__module__}.{fn.__name__}"
     return _qualified_name(fn)
@@ -586,21 +566,6 @@ def _iter_attrs(obj) -> Iterable[tuple[str, object]]:
     )
 
 
-def _is_leaf_value(value) -> bool:
-    return isinstance(value, (str, bytes, int, float, bool, Path)) or value is None
-
-
-def _has_custom_repr(obj) -> bool:
-    obj_repr = obj.__class__.__repr__
-    return obj_repr is not object.__repr__
-
-
-def _summarize_iter_item(item) -> str:
-    if _has_custom_repr(item):
-        return str(item)
-    return _summarize_value(item)
-
-
 def _truncate_text(text: str, *, max_len: int = 200) -> str:
     if len(text) <= max_len:
         return text
@@ -610,25 +575,22 @@ def _truncate_text(text: str, *, max_len: int = 200) -> str:
 def _dump_attrs(
     logger: logging.Logger,
     obj,
-    *,
     indent: str,
     depth: int,
     max_depth: int,
     seen: set[int],
 ) -> None:
     if depth > max_depth:
-        _log(logger, logging.INFO, "%s...", indent, stacklevel=3)
+        logger.log(logging.INFO, "%s...", indent, stacklevel=3)
         return
     obj_id = id(obj)
     if obj_id in seen:
-        _log(logger, logging.INFO, "%s<recursive>", indent, stacklevel=3)
         return
     seen.add(obj_id)
 
     for key, value in _iter_attrs(obj):
         if isinstance(value, torch.nn.Module):
-            _log(
-                logger,
+            logger.log(
                 logging.INFO,
                 "%s%s: %s",
                 indent,
@@ -638,8 +600,7 @@ def _dump_attrs(
             )
             continue
         if isinstance(value, Iterator):
-            _log(
-                logger,
+            logger.log(
                 logging.INFO,
                 "%s%s: %s",
                 indent,
@@ -648,19 +609,27 @@ def _dump_attrs(
                 stacklevel=3,
             )
             continue
-        if _is_leaf_value(value):
-            _log(
-                logger,
+        if value is None:
+            summary = "None"
+        elif isinstance(value, (str, bytes, int, float, bool)):
+            summary = repr(value)
+        elif isinstance(value, Path):
+            summary = repr(str(value))
+        else:
+            summary = None
+
+        if summary is not None:
+            logger.log(
                 logging.INFO,
                 "%s%s: %s",
                 indent,
                 key,
-                _summarize_value(value),
+                summary,
                 stacklevel=3,
             )
             continue
-        _log(
-            logger,
+
+        logger.log(
             logging.INFO,
             "%s%s: %s",
             indent,
@@ -671,22 +640,78 @@ def _dump_attrs(
         _dump_attrs(
             logger,
             value,
-            indent=indent + "  ",
+            indent=indent * 2,
             depth=depth + 1,
             max_depth=max_depth,
             seen=seen,
         )
 
 
+def _log_component(
+    logger: logging.Logger,
+    kind: str,
+    label: str,
+    obj,
+    max_depth: int,
+) -> None:
+    if obj is None:
+        return
+    logger.log(
+        logging.INFO,
+        "%s[%s] class: %s",
+        kind,
+        label,
+        _qualified_name(obj),
+        stacklevel=2,
+    )
+    logger.log(logging.INFO, "%s[%s]: %s", kind, label, obj, stacklevel=2)
+    _dump_attrs(
+        logger,
+        obj,
+        indent="  ",
+        depth=0,
+        max_depth=max_depth,
+        seen=set(),
+    )
+
+
+# =============================================================================
+# Model/Optimizer Summary
+# =============================================================================
+def _summarize_param_modules(model, params: Iterable) -> str | None:
+    """Summarize parameter distribution by top-level module name.
+
+    Note: We derive `params` from the optimizer (not from `model.parameters()`)
+    so the summary reflects the parameters actually optimized, which matters
+    when multiple optimizers or frozen parameter subsets are used.
+    """
+    param_name_map = {id(p): name for name, p in model.named_parameters()}
+
+    counts: dict[str, int] = {}
+    total = 0
+    for p in params:
+        numel = int(p.numel())
+        total += numel
+        name = param_name_map[id(p)]
+        key = name.split(".", 1)[0]
+        counts[key] = counts.get(key, 0) + numel
+
+    if total == 0:
+        return None
+
+    items = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
+    parts = [f"{k}({v / total * 100:.1f}%)" for k, v in items]
+    return ", ".join(parts)
+
+
 def log_training_summary(
     logger: logging.Logger,
     model,
-    *,
     optimizer=None,
     scheduler=None,
 ) -> None:
     """Log model architecture/summary and optimizer/scheduler details."""
-    _log(logger, logging.INFO, "Model:\n%s", model, stacklevel=2)
+    logger.log(logging.INFO, "Model:\n%s", model, stacklevel=2)
 
     params = list(model.parameters())
     total_params = sum(p.numel() for p in params)
@@ -701,63 +726,50 @@ def log_training_summary(
         f"{k}({v / total_params * 100:.1f}%)" for k, v in dtype_items
     )
 
-    _log(logger, logging.INFO, "Model summary:", stacklevel=2)
-    _log(logger, logging.INFO, "    Class Name: %s", type(model).__name__, stacklevel=2)
-    _log(
-        logger,
+    logger.log(logging.INFO, "Model summary:", stacklevel=2)
+    logger.log(logging.INFO, "    Class Name: %s", type(model).__name__, stacklevel=2)
+    logger.log(
         logging.INFO,
         "    Total Number of model parameters: %s",
-        _format_param_count(total_params),
+        format_number(total_params),
         stacklevel=2,
     )
-    _log(
-        logger,
+    logger.log(
         logging.INFO,
         "    Number of trainable parameters: %s (%.1f%%)",
-        _format_param_count(trainable_params),
+        format_number(trainable_params),
         (trainable_params / total_params * 100.0) if total_params else 0.0,
         stacklevel=2,
     )
-    _log(logger, logging.INFO, "    Size: %s", _format_size(size_bytes), stacklevel=2)
-    _log(logger, logging.INFO, "    Type: %s", dtype_desc, stacklevel=2)
-
-    if optimizer is None:
-        return
-
-    try:
-        from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
-    except Exception:
-        MultipleOptimizer = None
+    logger.log(logging.INFO, "    Size: %s", format_size(size_bytes), stacklevel=2)
+    logger.log(logging.INFO, "    Type: %s", dtype_desc, stacklevel=2)
 
     optimizers = []
-    if MultipleOptimizer is not None and isinstance(optimizer, MultipleOptimizer):
+    if isinstance(optimizer, MultipleOptimizer):
         optimizers = list(optimizer.optimizers)
     else:
         optimizers = [optimizer]
 
     for idx, optim in enumerate(optimizers):
-        _log(logger, logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
-        _log(logger, logging.INFO, "%s", optim, stacklevel=2)
-        try:
-            all_params = [p for g in optim.param_groups for p in g.get("params", [])]
-        except Exception:
-            all_params = []
+        logger.log(logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
+        logger.log(logging.INFO, "%s", optim, stacklevel=2)
+        all_params = [p for g in optim.param_groups for p in g.get("params", [])]
         module_summary = _summarize_param_modules(model, all_params)
         if module_summary:
-            _log(logger, logging.INFO, "    modules: %s", module_summary, stacklevel=2)
-
-    if scheduler is None:
-        return
+            logger.log(logging.INFO, "    modules: %s", module_summary, stacklevel=2)
 
     if isinstance(scheduler, list):
         schedulers = scheduler
     else:
         schedulers = [scheduler]
     for idx, sch in enumerate(schedulers):
-        _log(logger, logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
-        _log(logger, logging.INFO, "%s", sch, stacklevel=2)
+        logger.log(logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
+        logger.log(logging.INFO, "%s", sch, stacklevel=2)
 
 
+# =============================================================================
+# Dataset/Data Organizer Logging
+# =============================================================================
 def _log_dataset(
     logger: logging.Logger,
     dataset,
@@ -766,11 +778,8 @@ def _log_dataset(
     indent: str = "  ",
     depth: int = 0,
 ) -> None:
-    from espnet3.components.data.dataset import CombinedDataset, DatasetWithTransform
-
     prefix = indent * (depth + 1)
-    _log(
-        logger,
+    logger.log(
         logging.INFO,
         "%s%s class: %s",
         indent * depth,
@@ -791,79 +800,68 @@ def _log_dataset(
         for i, (child, (transform, preprocessor)) in enumerate(
             zip(dataset.datasets, dataset.transforms)
         ):
-            _log(logger, logging.INFO, "%scombined[%d]:", prefix, i, stacklevel=3)
-            _log(
+            logger.log(logging.INFO, "%scombined[%d]:", prefix, i, stacklevel=3)
+            _log_dataset_block(
                 logger,
-                logging.INFO,
-                "%stransform: %s",
-                indent * (depth + 2),
-                _callable_name(transform),
-                stacklevel=3,
-            )
-            _log(
-                logger,
-                logging.INFO,
-                "%spreprocessor: %s",
-                indent * (depth + 2),
-                _callable_name(preprocessor),
-                stacklevel=3,
-            )
-            _log(
-                logger,
-                logging.INFO,
-                "%sdataset class: %s",
-                indent * (depth + 2),
-                _qualified_name(child),
-                stacklevel=3,
-            )
-            _log(
-                logger,
-                logging.INFO,
-                "%slen: %s",
-                indent * (depth + 3),
-                len(child),
-                stacklevel=3,
+                indent=indent,
+                depth=depth + 2,
+                transform=transform,
+                preprocessor=preprocessor,
+                dataset=child,
             )
     elif isinstance(dataset, DatasetWithTransform):
-        _log(
+        _log_dataset_block(
             logger,
-            logging.INFO,
-            "%stransform: %s",
-            indent * (depth + 1),
-            _callable_name(dataset.transform),
-            stacklevel=3,
+            indent=indent,
+            depth=depth + 1,
+            transform=dataset.transform,
+            preprocessor=dataset.preprocessor,
+            dataset=dataset.dataset,
         )
-        _log(
-            logger,
-            logging.INFO,
-            "%spreprocessor: %s",
-            indent * (depth + 1),
-            _callable_name(dataset.preprocessor),
-            stacklevel=3,
-        )
-        child = dataset.dataset
-        _log(
-            logger,
-            logging.INFO,
-            "%sdataset class: %s",
-            indent * (depth + 1),
-            _qualified_name(child),
-            stacklevel=3,
-        )
-        _log(
-            logger,
-            logging.INFO,
-            "%slen: %s",
-            indent * (depth + 2),
-            len(child),
-            stacklevel=3,
-        )
+
+
+def _log_dataset_block(
+    logger: logging.Logger,
+    *,
+    indent: str,
+    depth: int,
+    transform,
+    preprocessor,
+    dataset,
+) -> None:
+    logger.log(
+        logging.INFO,
+        "%stransform: %s",
+        indent * depth,
+        _callable_name(transform),
+        stacklevel=3,
+    )
+    logger.log(
+        logging.INFO,
+        "%spreprocessor: %s",
+        indent * depth,
+        _callable_name(preprocessor),
+        stacklevel=3,
+    )
+    logger.log(
+        logging.INFO,
+        "%sdataset class: %s",
+        indent * depth,
+        _qualified_name(dataset),
+        stacklevel=3,
+    )
+    logger.log(
+        logging.INFO,
+        "%slen: %s",
+        indent * (depth + 1),
+        len(dataset),
+        stacklevel=3,
+    )
 
 
 def log_data_organizer(logger: logging.Logger, data_organizer) -> None:
     """Log dataset organizer and dataset details."""
-    _log(
-        logger,
+    logger.log(
         logging.INFO,
         "Data organizer: %s",
         _qualified_name(data_organizer),
@@ -875,21 +873,21 @@ def log_data_organizer(logger: logging.Logger, data_organizer) -> None:
     test = getattr(data_organizer, "test", None)
 
     if train is None:
-        _log(logger, logging.INFO, "train dataset: None", stacklevel=2)
+        logger.log(logging.INFO, "train dataset: None", stacklevel=2)
     else:
         _log_dataset(logger, train, label="train")
 
     if valid is None:
-        _log(logger, logging.INFO, "valid dataset: None", stacklevel=2)
+        logger.log(logging.INFO, "valid dataset: None", stacklevel=2)
     else:
         _log_dataset(logger, valid, label="valid")
 
     if not test:
-        _log(logger, logging.INFO, "test datasets: None", stacklevel=2)
+        logger.log(logging.INFO, "test datasets: None", stacklevel=2)
         return
 
     if isinstance(test, dict):
-        _log(logger, logging.INFO, "test datasets: %d", len(test), stacklevel=2)
+        logger.log(logging.INFO, "test datasets: %d", len(test), stacklevel=2)
         for name, ds in test.items():
             _log_dataset(logger, ds, label=f"test[{name}]")
     else:
@@ -899,7 +897,6 @@ def log_data_organizer(logger: logging.Logger, data_organizer) -> None:
 def log_dataloader(
     logger: logging.Logger,
     loader,
-    *,
     label: str,
     sampler=None,
     batch_sampler=None,
@@ -911,141 +908,76 @@ def log_dataloader(
     if _LOGGED_DATALOADER:
         return
     _LOGGED_DATALOADER = True
-    if hasattr(loader, "dataset") and hasattr(loader, "batch_size"):
-        dataset = getattr(loader, "dataset", None)
-        try:
-            dataset_len = len(dataset) if dataset is not None else None
-        except Exception:
-            dataset_len = None
-        dataset_name = _qualified_name(dataset) if dataset is not None else "None"
-        if dataset_len is not None:
-            dataset_desc = f"{dataset_name}(len={dataset_len})"
-        else:
-            dataset_desc = dataset_name
+    dataset = loader.dataset
+    dataset_len = len(dataset)
+    dataset_desc = f"{_qualified_name(dataset)}(len={dataset_len})"
 
-        sampler_obj = getattr(loader, "sampler", None)
-        sampler_name = (
-            _qualified_name(sampler_obj) if sampler_obj is not None else "None"
-        )
-        batch_sampler_obj = getattr(loader, "batch_sampler", None)
-        batch_sampler_name = (
-            _qualified_name(batch_sampler_obj)
-            if batch_sampler_obj is not None
-            else "None"
-        )
-        collate_fn = getattr(loader, "collate_fn", None)
-        collate_name = _callable_name(collate_fn) if collate_fn is not None else "None"
-        multiprocessing_ctx = getattr(loader, "multiprocessing_context", None)
-        if multiprocessing_ctx is not None:
-            multiprocessing_ctx = getattr(
-                multiprocessing_ctx, "get_start_method", lambda: multiprocessing_ctx
-            )()
+    sampler_obj = getattr(loader, "sampler", None)
+    sampler_name = _qualified_name(sampler_obj) if sampler_obj is not None else "None"
+    batch_sampler_obj = getattr(loader, "batch_sampler", None)
+    batch_sampler_name = (
+        _qualified_name(batch_sampler_obj) if batch_sampler_obj is not None else "None"
+    )
+    collate_fn = getattr(loader, "collate_fn", None)
+    collate_name = _callable_name(collate_fn) if collate_fn is not None else "None"
+    multiprocessing_ctx = getattr(loader, "multiprocessing_context", None)
+    if multiprocessing_ctx is not None:
+        multiprocessing_ctx = getattr(
+            multiprocessing_ctx, "get_start_method", lambda: multiprocessing_ctx
+        )()
 
-        lines = [
-            "[DataLoader]",
-            f"  dataset           : {dataset_desc}",
-            f"  batch_size        : {getattr(loader, 'batch_size', None)}",
-            f"  shuffle           : {getattr(loader, 'shuffle', None)}",
-            f"  sampler           : {sampler_name}",
-            f"  batch_sampler     : {batch_sampler_name}",
-            f"  num_workers       : {getattr(loader, 'num_workers', None)}",
-            f"  drop_last         : {getattr(loader, 'drop_last', None)}",
-            f"  pin_memory        : {getattr(loader, 'pin_memory', None)}",
-            f"  persistent_workers: {getattr(loader, 'persistent_workers', None)}",
-            f"  prefetch_factor   : {getattr(loader, 'prefetch_factor', None)}",
-            f"  timeout           : {getattr(loader, 'timeout', None)}",
-            f"  multiprocessing   : {multiprocessing_ctx}",
-            f"  collate_fn        : {collate_name}",
-        ]
-        _log(
-            logger,
-            logging.INFO,
-            "DataLoader[%s]:\n%s",
-            label,
-            "\n".join(lines),
-            stacklevel=2,
-        )
-    else:
-        _log(
-            logger,
-            logging.INFO,
-            "DataLoader[%s] class: %s",
-            label,
-            _qualified_name(loader),
-            stacklevel=2,
-        )
-        _log(logger, logging.INFO, "DataLoader[%s]:\n%s", label, loader, stacklevel=2)
+    lines = [
+        "[DataLoader]",
+        f"  dataset           : {dataset_desc}",
+        f"  batch_size        : {loader.batch_size}",
+        f"  shuffle           : {getattr(loader, 'shuffle', None)}",
+        f"  sampler           : {sampler_name}",
+        f"  batch_sampler     : {batch_sampler_name}",
+        f"  num_workers       : {loader.num_workers}",
+        f"  drop_last         : {loader.drop_last}",
+        f"  pin_memory        : {loader.pin_memory}",
+        f"  persistent_workers: {loader.persistent_workers}",
+        f"  prefetch_factor   : {loader.prefetch_factor}",
+        f"  timeout           : {loader.timeout}",
+        f"  multiprocessing   : {multiprocessing_ctx}",
+        f"  collate_fn        : {collate_name}",
+    ]
+    logger.log(
+        logging.INFO,
+        "DataLoader[%s]:\n%s",
+        label,
+        "\n".join(lines),
+        stacklevel=2,
+    )
 
-    if sampler is not None:
-        _log(
-            logger,
-            logging.INFO,
-            "Sampler[%s] class: %s",
-            label,
-            _qualified_name(sampler),
-            stacklevel=2,
-        )
-        _log(logger, logging.INFO, "Sampler[%s]: %s", label, sampler, stacklevel=2)
-        _dump_attrs(
-            logger,
-            sampler,
-            indent="  ",
-            depth=0,
-            max_depth=2,
-            seen=set(),
-        )
-
-    if batch_sampler is not None:
-        _log(
-            logger,
-            logging.INFO,
-            "BatchSampler[%s] class: %s",
-            label,
-            _qualified_name(batch_sampler),
-            stacklevel=2,
-        )
-        _log(
-            logger,
-            logging.INFO,
-            "BatchSampler[%s]: %s",
-            label,
-            batch_sampler,
-            stacklevel=2,
-        )
-        _dump_attrs(
-            logger,
-            batch_sampler,
-            indent="  ",
-            depth=0,
-            max_depth=2,
-            seen=set(),
-        )
-
-    if iter_factory is not None:
-        _log(
-            logger,
-            logging.INFO,
-            "IterFactory[%s]: %s",
-            label,
-            _qualified_name(iter_factory),
-            stacklevel=2,
-        )
-        _dump_attrs(
-            logger,
-            iter_factory,
-            indent="  ",
-            depth=0,
-            max_depth=3,
-            seen=set(),
-        )
+    _log_component(
+        logger,
+        kind="Sampler",
+        label=label,
+        obj=sampler,
+        max_depth=2,
+    )
+    _log_component(
+        logger,
+        kind="BatchSampler",
+        label=label,
+        obj=batch_sampler,
+        max_depth=2,
+    )
+    _log_component(
+        logger,
+        kind="IterFactory",
+        label=label,
+        obj=iter_factory,
+        max_depth=3,
+    )
 
     if batches is not None:
         try:
             batch_count = len(batches)
         except Exception:
             batch_count = None
-        _log(
-            logger,
+        logger.log(
             logging.INFO,
             "IterBatches[%s]: %s",
             label,
@@ -1053,8 +985,7 @@ def log_dataloader(
             stacklevel=2,
         )
         if batch_count is not None:
-            _log(
-                logger,
+            logger.log(
                 logging.INFO,
                 "IterBatches[%s]: %d batches",
                 label,
