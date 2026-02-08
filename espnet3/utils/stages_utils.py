@@ -6,6 +6,8 @@ import logging
 import time
 from typing import Any, Iterable, List, Sequence
 
+from espnet3.utils.logging_utils import log_stage
+
 logger = logging.getLogger(__name__)
 
 
@@ -50,8 +52,6 @@ def run_stages(
         fn = getattr(system, stage, None)
         if fn is None:
             raise AttributeError(f"System has no stage method: {stage}")
-
-        from espnet3.utils.logging_utils import log_stage
 
         with log_stage(stage):
             if dry_run:

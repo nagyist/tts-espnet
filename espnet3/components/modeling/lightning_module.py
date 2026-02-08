@@ -13,6 +13,11 @@ from espnet3.components.data.collect_stats import collect_stats
 from espnet3.components.data.dataloader import DataLoaderBuilder
 from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 from espnet3.components.optimizers.multiple_scheduler import MultipleScheduler
+from espnet3.utils.logging_utils import (
+    log_data_organizer,
+    log_stage,
+    log_training_summary,
+)
 
 logger = logging.getLogger("lightning")
 
@@ -46,7 +51,6 @@ class ESPnetLightningModule(lightning.LightningModule):
         self.config = config
         self.model = model
         data_organizer = instantiate(config.dataset)
-        from espnet3.utils.logging_utils import log_data_organizer
 
         log_data_organizer(logger, data_organizer)
         self.train_dataset = data_organizer.train
@@ -351,8 +355,6 @@ class ESPnetLightningModule(lightning.LightningModule):
                 "`schedulers`"
             )
 
-        from espnet3.utils.logging_utils import log_training_summary
-
         log_training_summary(
             logger,
             self.model,
@@ -374,8 +376,6 @@ class ESPnetLightningModule(lightning.LightningModule):
         Returns:
             DataLoader: The training DataLoader.
         """
-        from espnet3.utils.logging_utils import log_stage
-
         self.train_dataset.use_espnet_collator = isinstance(
             self.collate_fn, CommonCollateFn
         )
@@ -395,8 +395,6 @@ class ESPnetLightningModule(lightning.LightningModule):
         Returns:
             DataLoader: The validation DataLoader.
         """
-        from espnet3.utils.logging_utils import log_stage
-
         self.valid_dataset.use_espnet_collator = isinstance(
             self.collate_fn, CommonCollateFn
         )

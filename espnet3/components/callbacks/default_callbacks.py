@@ -1,6 +1,7 @@
 """Callbacks for ESPnet3 trainer."""
 
 import logging
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import List, Tuple, Union
@@ -150,6 +151,7 @@ optim0_lr0=2.458e-06
     """
 
     def __init__(self, log_every_n_steps: int = 500):
+        """Initialize the logger with a reporting interval."""
         self.log_every_n_steps = int(log_every_n_steps)
         self._sum = defaultdict(float)
         self._count = 0
@@ -161,6 +163,7 @@ optim0_lr0=2.458e-06
         self._optim_step_start_time = None
 
     def _reset(self):
+        """Clear buffered metrics for the next logging window."""
         self._sum.clear()
         self._count = 0
         self._start_batch = None
@@ -170,9 +173,8 @@ optim0_lr0=2.458e-06
         self._optim_step_start_time = None
 
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
+        """Start timers for a training batch."""
         # Use wall clock for simplicity; Lightning doesn't expose loader timing.
-        import time
-
         t = time.perf_counter()
         if self._last_batch_end_time is not None:
             iter_time = t - self._last_batch_end_time
@@ -181,36 +183,33 @@ optim0_lr0=2.458e-06
         self._forward_start_time = t
 
     def on_before_backward(self, trainer, pl_module, loss):
-        import time
-
+        """Mark the end of forward pass and start backward timing."""
         t = time.perf_counter()
         if self._forward_start_time is not None:
             self._sum["forward_time"] += t - self._forward_start_time
         self._backward_start_time = t
 
     def on_after_backward(self, trainer, pl_module):
-        import time
-
+        """Record backward time."""
         t = time.perf_counter()
         if self._backward_start_time is not None:
             self._sum["backward_time"] += t - self._backward_start_time
         self._backward_start_time = None
 
     def on_before_optimizer_step(self, trainer, pl_module, optimizer):
-        import time
-
+        """Start optimizer step timing."""
         self._optim_step_start_time = time.perf_counter()
 
     def on_after_optimizer_step(self, trainer, pl_module):
-        import time
-
+        """Record optimizer step time."""
         if self._optim_step_start_time is not None:
-            self._sum["optim_step_time"] += time.perf_counter() - self._optim_step_start_time
+            self._sum["optim_step_time"] += (
+                time.perf_counter() - self._optim_step_start_time
+            )
         self._optim_step_start_time = None
 
     def on_train_batch_end(self, trainer, pl_module, outputs, batch, batch_idx):
-        import time
-
+        """Aggregate metrics and emit a summary line when due."""
         metrics = trainer.callback_metrics or {}
 
         if self._start_batch is None:
@@ -272,6 +271,7 @@ optim0_lr0=2.458e-06
         self._reset()
 
     def on_train_epoch_end(self, trainer, pl_module):
+        """Reset buffers at the end of each training epoch."""
         self._reset()
 
 

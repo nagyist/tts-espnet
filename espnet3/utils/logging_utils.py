@@ -17,6 +17,11 @@ from typing import Iterable, Mapping
 
 from humanfriendly import format_number, format_size
 
+try:
+    import torch
+except Exception:  # pragma: no cover - optional dependency
+    torch = None
+
 LOG_FORMAT = (
     "[%(hostname)s] %(asctime)s (%(filename)s:%(lineno)d) "
     "%(levelname)s:\t[%(stage)s] %(message)s"
@@ -44,6 +49,7 @@ _ensure_log_record_factory()
 
 @contextmanager
 def log_stage(name: str):
+    """Temporarily set the logging stage label used in log records."""
     token = _LOG_STAGE.set(name)
     try:
         yield
@@ -433,9 +439,7 @@ def log_env_metadata(
     logger.info("Cluster env:\n%s", cluster_dump)
     logger.info("Runtime env:\n%s", runtime_dump)
 
-    try:
-        import torch
-    except Exception:
+    if torch is None:
         logger.info("PyTorch: unavailable")
         return
 
@@ -660,9 +664,7 @@ def _log_dataset(
             )
     elif isinstance(dataset, DatasetWithTransform):
         logger.info("%stransform: %s", prefix, _callable_name(dataset.transform))
-        logger.info(
-            "%spreprocessor: %s", prefix, _callable_name(dataset.preprocessor)
-        )
+        logger.info("%spreprocessor: %s", prefix, _callable_name(dataset.preprocessor))
         _log_dataset(
             logger,
             dataset.dataset,
