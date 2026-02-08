@@ -156,6 +156,8 @@ optim0_lr0=2.458e-06
         self._sum = defaultdict(float)
         self._count = 0
         self._start_batch = None
+        self._epoch_sum = defaultdict(float)
+        self._epoch_count = 0
         self._last_batch_end_time = None
         self._batch_start_time = None
         self._forward_start_time = None
@@ -171,6 +173,11 @@ optim0_lr0=2.458e-06
         self._forward_start_time = None
         self._backward_start_time = None
         self._optim_step_start_time = None
+
+    def _reset_epoch(self):
+        """Clear epoch-level buffered metrics."""
+        self._epoch_sum.clear()
+        self._epoch_count = 0
 
     def on_train_batch_start(self, trainer, pl_module, batch, batch_idx):
         """Start timers for a training batch."""
@@ -228,6 +235,7 @@ optim0_lr0=2.458e-06
             except Exception:
                 continue
             self._sum[key] += value
+            self._epoch_sum[key] += value
 
         # Optimizer learning rates
         try:
@@ -239,12 +247,17 @@ optim0_lr0=2.458e-06
                 lr = group.get("lr")
                 if lr is not None:
                     self._sum[f"optim{opt_idx}_lr{group_idx}"] += float(lr)
+                    self._epoch_sum[f"optim{opt_idx}_lr{group_idx}"] += float(lr)
 
         if self._batch_start_time is not None:
             self._sum["train_time"] += time.perf_counter() - self._batch_start_time
+            self._epoch_sum["train_time"] += (
+                time.perf_counter() - self._batch_start_time
+            )
 
         self._last_batch_end_time = time.perf_counter()
         self._count += 1
+        self._epoch_count += 1
         if self.log_every_n_steps <= 0:
             return
         if (batch_idx + 1) % self.log_every_n_steps != 0:
@@ -272,7 +285,28 @@ optim0_lr0=2.458e-06
 
     def on_train_epoch_end(self, trainer, pl_module):
         """Reset buffers at the end of each training epoch."""
+        if self._epoch_count > 0:
+            avg = {
+                k: (v / self._epoch_count if self._epoch_count else v)
+                for k, v in self._epoch_sum.items()
+            }
+            time_keys = [
+                "iter_time",
+                "forward_time",
+                "backward_time",
+                "optim_step_time",
+                "train_time",
+            ]
+            lr_keys = sorted(k for k in avg if k.startswith("optim") and "_lr" in k)
+            user_keys = sorted(
+                k for k in avg.keys() if k not in time_keys and k not in lr_keys
+            )
+            keys = [k for k in time_keys if k in avg] + user_keys + lr_keys
+            metrics_str = ", ".join(f"{k}={avg[k]:.6g}" for k in keys)
+            epoch = trainer.current_epoch + 1
+            logging.info("epoch_summary:%depoch:train: %s", epoch, metrics_str)
         self._reset()
+        self._reset_epoch()
 
 
 @typechecked
