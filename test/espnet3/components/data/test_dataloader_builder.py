@@ -106,6 +106,15 @@ def dummy_collate_fn(batch):
     return {"custom_collated": batch}
 
 
+class DummyIterFactory:
+    def __init__(self, dataset, batches, **kwargs):
+        self.dataset = dataset
+        self.batches = list(batches)
+
+    def build_iter(self, epoch, shuffle=False):
+        return list(self.batches)
+
+
 # -------- Config mocks --------
 
 
@@ -317,6 +326,44 @@ dataloader:
     assert len(batch[0]) == 2
     assert "audio" in batch[1]
     assert "audio_lengths" in batch[1]
+
+
+@pytest.mark.parametrize("rank", [0, 1])
+def test_iter_factory_drops_tail_batches_for_ddp(monkeypatch, rank):
+    import espnet3.components.data.dataloader as dl
+
+    # 5 total batches -> for world_size=2, drop 1 tail batch, keep 4
+    def _fake_build_batch_sampler(**kwargs):
+        return [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+
+    monkeypatch.setattr(dl, "build_batch_sampler", _fake_build_batch_sampler)
+    monkeypatch.setattr(dl.torch.distributed, "get_world_size", lambda: 2)
+    monkeypatch.setattr(dl.torch.distributed, "get_rank", lambda: rank)
+
+    config = OmegaConf.create(
+        {
+            "dataloader": {
+                "train": {
+                    "iter_factory": {
+                        "_target_": (
+                            "test.espnet3.components.data."
+                            "test_dataloader_builder.DummyIterFactory"
+                        ),
+                        "batches": {"dummy": 1},
+                    }
+                }
+            }
+        }
+    )
+
+    dataset = DummyDataset()
+    builder = DataLoaderBuilder(
+        dataset=dataset, config=config, collate_fn=None, num_device=2, epoch=0
+    )
+    iterator = builder.build("train")
+
+    assert len(iterator) == 2
+    assert all(batch[0] != 8 for batch in iterator)
 
 
 # --- Multiple Iterator Mode (Sharded Dataset) ---

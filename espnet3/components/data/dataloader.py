@@ -205,6 +205,22 @@ class DataLoaderBuilder:
             world_size = torch.distributed.get_world_size()
             rank = torch.distributed.get_rank()
             total_batches = len(batches)
+            remainder = total_batches % world_size
+            if remainder != 0:
+                # Drop tail batches so each rank sees the same number of batches.
+                # This avoids DDP barrier deadlocks when per-rank batch counts differ.
+                keep = total_batches - remainder
+                logger.warning(
+                    "[%s] Dropping %s tail batches to align with world_size=%s "
+                    "(total=%s -> keep=%s)",
+                    mode,
+                    remainder,
+                    world_size,
+                    total_batches,
+                    keep,
+                )
+                batches = batches[:keep]
+                total_batches = len(batches)
             for batch in batches:
                 if len(batch) < world_size:
                     raise RuntimeError(

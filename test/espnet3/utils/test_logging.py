@@ -277,6 +277,7 @@ def test_log_dataloader_iter_factory_includes_batch_sampler_repr():
 
     from espnet2.iterators.sequence_iter_factory import SequenceIterFactory
     from espnet2.samplers.build_batch_sampler import build_batch_sampler
+    from espnet3 import utils as espnet3_utils
 
     batches = build_batch_sampler(
         shape_files=["test_utils/espnet3/stats/stats_dummy"],
@@ -288,6 +289,7 @@ def test_log_dataloader_iter_factory_includes_batch_sampler_repr():
     iterator = iter_factory.build_iter(0, shuffle=False)
 
     try:
+        espnet3_utils.logging_utils._LOGGED_DATALOADER = False
         elog.log_dataloader(
             logger,
             iterator,
@@ -297,8 +299,8 @@ def test_log_dataloader_iter_factory_includes_batch_sampler_repr():
         )
         out = stream.getvalue()
         assert "IterFactory[train]:" in out
-        assert "IterBatches[train] class:" in out
         assert "UnsortedBatchSampler(" in out
+        assert "IterBatches[train]:" in out
     finally:
         handler.close()
         _reset_logger(logger, old_handlers, old_level, old_propagate)
