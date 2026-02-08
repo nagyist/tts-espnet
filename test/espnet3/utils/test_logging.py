@@ -243,11 +243,10 @@ def test_log_data_organizer_combined_variants():
         assert "valid class: espnet3.components.data.dataset.CombinedDataset" in out
         assert "combined[0]:" in out
         assert "combined[1]:" in out
-        assert "transform: test.espnet3.utils.test_logging.custom_transform" in out
-        assert "transform: test.espnet3.utils.test_logging.other_transform" in out
-        assert "preprocessor: test.espnet3.utils.test_logging.custom_preprocessor" in out
-        # None preprocessor becomes do_nothing_transform
-        assert "preprocessor: espnet3.components.data.dataset.do_nothing_transform" in out
+        assert "transform: test_logging.custom_transform" in out
+        assert "transform: test_logging.other_transform" in out
+        assert "preprocessor: test_logging.custom_preprocessor" in out
+        assert "preprocessor: builtins.NoneType" in out
     finally:
         handler.close()
         _reset_logger(logger, old_handlers, old_level, old_propagate)

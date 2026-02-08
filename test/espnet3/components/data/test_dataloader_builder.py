@@ -210,7 +210,7 @@ def test_sampler_and_batch_sampler_conflict():
     with pytest.raises(
         AssertionError, match="Cannot specify both sampler and batch_sampler"
     ):
-        _ = builder._build_standard_dataloader(config.dataloader.train)
+        _ = builder._build_standard_dataloader(config.dataloader.train, mode="train")
 
 
 # -------- IterFactory Mode & YAML-based Integration --------
