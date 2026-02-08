@@ -9,7 +9,6 @@ import shlex
 import socket
 import subprocess
 import sys
-from collections.abc import Iterable
 from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
@@ -17,6 +16,7 @@ from shutil import which
 from typing import Iterable, Mapping
 
 from humanfriendly import format_number, format_size
+
 from espnet2.samplers.abs_sampler import AbsSampler
 
 try:
@@ -873,7 +873,7 @@ def _log_dataset(
             logger,
             logging.INFO,
             "%slen: %s",
-            indent * (depth + 2) ,
+            indent * (depth + 2),
             len(child),
             stacklevel=3,
         )
@@ -939,16 +939,22 @@ def log_dataloader(
             dataset_desc = dataset_name
 
         sampler_obj = getattr(loader, "sampler", None)
-        sampler_name = _qualified_name(sampler_obj) if sampler_obj is not None else "None"
+        sampler_name = (
+            _qualified_name(sampler_obj) if sampler_obj is not None else "None"
+        )
         batch_sampler_obj = getattr(loader, "batch_sampler", None)
         batch_sampler_name = (
-            _qualified_name(batch_sampler_obj) if batch_sampler_obj is not None else "None"
+            _qualified_name(batch_sampler_obj)
+            if batch_sampler_obj is not None
+            else "None"
         )
         collate_fn = getattr(loader, "collate_fn", None)
         collate_name = _callable_name(collate_fn) if collate_fn is not None else "None"
         multiprocessing_ctx = getattr(loader, "multiprocessing_context", None)
         if multiprocessing_ctx is not None:
-            multiprocessing_ctx = getattr(multiprocessing_ctx, "get_start_method", lambda: multiprocessing_ctx)()
+            multiprocessing_ctx = getattr(
+                multiprocessing_ctx, "get_start_method", lambda: multiprocessing_ctx
+            )()
 
         lines = [
             "[DataLoader]",

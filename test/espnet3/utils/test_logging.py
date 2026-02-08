@@ -175,7 +175,9 @@ def test_log_training_summary_includes_model_and_optimizer():
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
     try:
-        elog.log_training_summary(logger, model, optimizer=optimizer, scheduler=scheduler)
+        elog.log_training_summary(
+            logger, model, optimizer=optimizer, scheduler=scheduler
+        )
         out = stream.getvalue()
         assert "Model summary:" in out
         assert "Class Name: DummyModel" in out
