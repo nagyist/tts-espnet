@@ -187,7 +187,7 @@ class DataLoaderBuilder:
         log_dataloader(
             logger,
             loader,
-            label=f"{mode}",
+            label=mode,
             sampler=sampler,
             batch_sampler=batch_sampler,
         )
@@ -216,7 +216,7 @@ class DataLoaderBuilder:
         log_dataloader(
             logger,
             iterator,
-            label=f"{mode}",
+            label=mode,
             iter_factory=iter_factory,
             batches=batches,
         )
