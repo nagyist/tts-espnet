@@ -36,7 +36,7 @@ _LOGGED_DATALOADER: bool = False
 _BASE_RECORD_FACTORY = logging.getLogRecordFactory()
 
 
-def _record_factory(*args, **kwargs):
+def _build_record(*args, **kwargs):
     # Inject custom fields used by LOG_FORMAT (stage/hostname) into each LogRecord.
     record = _BASE_RECORD_FACTORY(*args, **kwargs)
     record.stage = _LOG_STAGE.get()
@@ -44,7 +44,7 @@ def _record_factory(*args, **kwargs):
     return record
 
 
-logging.setLogRecordFactory(_record_factory)
+logging.setLogRecordFactory(_build_record)
 
 
 @contextmanager
@@ -60,7 +60,7 @@ def log_stage(name: str):
 # =============================================================================
 # Logging Configuration (Handlers/Formatters)
 # =============================================================================
-def _next_rotated_log_path(target: Path) -> Path:
+def _get_next_rotated_log_path(target: Path) -> Path:
     """Return the next available rotated log path (e.g., run1.log)."""
     suffixes = target.suffixes
     suffix = "".join(suffixes)
@@ -140,7 +140,7 @@ def configure_logging(
         )
         if not has_file:
             if target.exists():
-                rotated = _next_rotated_log_path(target)
+                rotated = _get_next_rotated_log_path(target)
                 os.replace(target, rotated)
             file_handler = logging.FileHandler(target)
             file_handler.setFormatter(formatter)
@@ -530,12 +530,12 @@ def log_env_metadata(
 # =============================================================================
 # Introspection Helpers
 # =============================================================================
-def _qualified_name(obj) -> str:
+def _build_qualified_name(obj) -> str:
     """Return fully-qualified class name for an object or class.
 
     Example:
         ```python
-        _qualified_name(Path("/tmp"))
+        _build_qualified_name(Path("/tmp"))
         # => 'pathlib.PosixPath'
         ```
     """
@@ -543,18 +543,18 @@ def _qualified_name(obj) -> str:
     return f"{cls.__module__}.{cls.__name__}"
 
 
-def _callable_name(fn) -> str:
+def _build_callable_name(fn) -> str:
     """Return fully-qualified callable name when possible.
 
     Example:
         ```python
-        _callable_name(len)
+        _build_callable_name(len)
         # => 'builtins.len'
         ```
     """
     if hasattr(fn, "__module__") and hasattr(fn, "__name__"):
         return f"{fn.__module__}.{fn.__name__}"
-    return _qualified_name(fn)
+    return _build_qualified_name(fn)
 
 
 def _iter_attrs(obj) -> Iterable[tuple[str, object]]:
@@ -595,7 +595,7 @@ def _dump_attrs(
                 "%s%s: %s",
                 indent,
                 key,
-                _qualified_name(value),
+                _build_qualified_name(value),
                 stacklevel=3,
             )
             continue
@@ -634,7 +634,7 @@ def _dump_attrs(
             "%s%s: %s",
             indent,
             key,
-            _qualified_name(value),
+            _build_qualified_name(value),
             stacklevel=3,
         )
         _dump_attrs(
@@ -661,7 +661,7 @@ def _log_component(
         "%s[%s] class: %s",
         kind,
         label,
-        _qualified_name(obj),
+        _build_qualified_name(obj),
         stacklevel=2,
     )
     logger.log(logging.INFO, "%s[%s]: %s", kind, label, obj, stacklevel=2)
@@ -784,7 +784,7 @@ def _log_dataset(
         "%s%s class: %s",
         indent * depth,
         label,
-        _qualified_name(dataset),
+        _build_qualified_name(dataset),
         stacklevel=3,
     )
 
@@ -833,21 +833,21 @@ def _log_dataset_block(
         logging.INFO,
         "%stransform: %s",
         indent * depth,
-        _callable_name(transform),
+        _build_callable_name(transform),
         stacklevel=3,
     )
     logger.log(
         logging.INFO,
         "%spreprocessor: %s",
         indent * depth,
-        _callable_name(preprocessor),
+        _build_callable_name(preprocessor),
         stacklevel=3,
     )
     logger.log(
         logging.INFO,
         "%sdataset class: %s",
         indent * depth,
-        _qualified_name(dataset),
+        _build_qualified_name(dataset),
         stacklevel=3,
     )
     logger.log(
@@ -864,7 +864,7 @@ def log_data_organizer(logger: logging.Logger, data_organizer) -> None:
     logger.log(
         logging.INFO,
         "Data organizer: %s",
-        _qualified_name(data_organizer),
+        _build_qualified_name(data_organizer),
         stacklevel=2,
     )
 
@@ -910,16 +910,16 @@ def log_dataloader(
     _LOGGED_DATALOADER = True
     dataset = loader.dataset
     dataset_len = len(dataset)
-    dataset_desc = f"{_qualified_name(dataset)}(len={dataset_len})"
+    dataset_desc = f"{_build_qualified_name(dataset)}(len={dataset_len})"
 
     sampler_obj = getattr(loader, "sampler", None)
-    sampler_name = _qualified_name(sampler_obj) if sampler_obj is not None else "None"
+    sampler_name = _build_qualified_name(sampler_obj) if sampler_obj is not None else "None"
     batch_sampler_obj = getattr(loader, "batch_sampler", None)
     batch_sampler_name = (
-        _qualified_name(batch_sampler_obj) if batch_sampler_obj is not None else "None"
+        _build_qualified_name(batch_sampler_obj) if batch_sampler_obj is not None else "None"
     )
     collate_fn = getattr(loader, "collate_fn", None)
-    collate_name = _callable_name(collate_fn) if collate_fn is not None else "None"
+    collate_name = _build_callable_name(collate_fn) if collate_fn is not None else "None"
     multiprocessing_ctx = getattr(loader, "multiprocessing_context", None)
     if multiprocessing_ctx is not None:
         multiprocessing_ctx = getattr(
