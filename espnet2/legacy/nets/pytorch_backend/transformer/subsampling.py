@@ -103,13 +103,24 @@ class Conv1dSubsampling1(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -141,8 +152,11 @@ class Conv1dSubsampling1(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
@@ -191,13 +205,24 @@ class Conv1dSubsampling2(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -229,8 +254,11 @@ class Conv1dSubsampling2(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
@@ -279,13 +307,24 @@ class Conv1dSubsampling3(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -317,8 +356,11 @@ class Conv1dSubsampling3(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
@@ -367,13 +409,24 @@ class Conv2dSubsampling(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -405,8 +458,11 @@ class Conv2dSubsampling(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
@@ -455,13 +511,24 @@ class Conv2dSubsampling1(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -493,8 +560,11 @@ class Conv2dSubsampling1(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
@@ -543,13 +613,24 @@ class Conv2dSubsampling2(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -581,8 +662,11 @@ class Conv2dSubsampling2(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
@@ -631,13 +715,24 @@ class Conv2dSubsampling6(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -713,13 +808,24 @@ class Conv2dSubsampling8(torch.nn.Module):
         )
 
     def _load_from_state_dict(
-        self, state_dict, prefix, local_metadata, strict,
-        missing_keys, unexpected_keys, error_msgs,
+        self,
+        state_dict,
+        prefix,
+        local_metadata,
+        strict,
+        missing_keys,
+        unexpected_keys,
+        error_msgs,
     ):
         _upgrade_legacy_subsampling_state_dict(state_dict, prefix)
         super()._load_from_state_dict(
-            state_dict, prefix, local_metadata, strict,
-            missing_keys, unexpected_keys, error_msgs,
+            state_dict,
+            prefix,
+            local_metadata,
+            strict,
+            missing_keys,
+            unexpected_keys,
+            error_msgs,
         )
 
     def forward(self, x, x_mask, prefix_embeds=None):
@@ -751,8 +857,11 @@ class Conv2dSubsampling8(torch.nn.Module):
                 x_mask = torch.cat(
                     [
                         torch.ones(
-                            x_mask.shape[0], 1, prefix_embeds.size(1),
-                            dtype=x_mask.dtype, device=x_mask.device,
+                            x_mask.shape[0],
+                            1,
+                            prefix_embeds.size(1),
+                            dtype=x_mask.dtype,
+                            device=x_mask.device,
                         ),
                         x_mask,
                     ],
