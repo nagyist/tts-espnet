@@ -14,7 +14,7 @@ from espnet3.components.data.collect_stats import collect_stats
 from espnet3.components.data.dataloader import DataLoaderBuilder
 from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 from espnet3.components.optimizers.multiple_scheduler import MultipleScheduler
-from espnet3.utils.logging_utils import _log_component, log_stage
+from espnet3.utils.logging_utils import log_component, log_stage
 
 logger = logging.getLogger("lightning")
 
@@ -471,7 +471,7 @@ class ESPnetLightningModule(lightning.LightningModule):
             optimizers = [optimizer]
         for idx, optim in enumerate(optimizers):
             logger.log(logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
-            _log_component(
+            log_component(
                 logger,
                 kind="Optimizer",
                 label=str(idx),
@@ -487,7 +487,7 @@ class ESPnetLightningModule(lightning.LightningModule):
             schedulers = [scheduler]
         for idx, sch in enumerate(schedulers):
             logger.log(logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
-            _log_component(
+            log_component(
                 logger,
                 kind="Scheduler",
                 label=str(idx),

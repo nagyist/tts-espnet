@@ -15,7 +15,7 @@ from lightning.pytorch.callbacks import (
 )
 from typeguard import typechecked
 
-from espnet3.utils.logging_utils import _log_component
+from espnet3.utils.logging_utils import log_component
 
 _LOGGED_CALLBACKS = False
 
@@ -405,7 +405,7 @@ def get_default_callbacks(
     if not _LOGGED_CALLBACKS:
         _LOGGED_CALLBACKS = True
         for idx, cb in enumerate(callbacks):
-            _log_component(
+            log_component(
                 logging.getLogger(__name__),
                 kind="Callback",
                 label=str(idx),

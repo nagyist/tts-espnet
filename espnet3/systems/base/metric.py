@@ -8,7 +8,7 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from espnet3.components.metrics.abs_metric import AbsMetric
-from espnet3.utils.logging_utils import _log_component
+from espnet3.utils.logging_utils import log_component
 from espnet3.utils.scp_utils import get_cls_path, load_scp_fields
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,7 @@ def metric(metrics_config: DictConfig):
         if not isinstance(metric, AbsMetric):
             raise TypeError(f"{type(metric)} is not a valid AbsMetric instance")
 
-        _log_component(
+        log_component(
             logger,
             kind="Metric",
             label=str(idx),

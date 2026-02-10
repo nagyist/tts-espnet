@@ -765,13 +765,62 @@ def _dump_attrs(
         )
 
 
-def _log_component(
+def log_component(
     logger: logging.Logger,
     kind: str,
     label: str,
     obj,
     max_depth: int,
 ) -> None:
+    """Log a component instance with class info, repr, and attributes.
+
+    Description:
+        Emits a structured log block for a single object. The block includes
+        a class line, a representation line, and a recursive attribute dump
+        up to the specified depth.
+
+    Args:
+        logger (logging.Logger): Logger used to emit messages.
+        kind (str): Label prefix for the entry (e.g., "Component", "Env").
+        label (str): Human-readable label identifying the entry.
+        obj: Object instance to log. If None, the function returns early.
+        max_depth (int): Maximum depth for recursive attribute dumping.
+
+    Raises:
+        None
+
+    Returns:
+        None
+
+    Example:
+        ```python
+        from espnet3.utils.logging_utils import log_component
+
+        # ESPnet3 dataset-like instance.
+        dataset = SomeDatasetClass(split="train")
+        log_component(logger, "Dataset", "train", dataset, max_depth=2)
+
+        # Torch optimizer instance.
+        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+        log_component(logger, "Optimizer", "adam", optimizer, max_depth=1)
+
+        # Custom class instance.
+        class CustomThing:
+            def __init__(self, name: str, value: int):
+                self.name = name
+                self.value = value
+
+            def __repr__(self) -> str:
+                return f"CustomThing(name={self.name!r}, value={self.value})"
+
+        log_component(logger, "Custom", "example", CustomThing("demo", 7), max_depth=1)
+        ```
+
+    Notes:
+        - The logger uses `stacklevel=2` so log lines point at the caller.
+        - Attribute dumping uses `build_qualified_name` for readable class names.
+        - Set `max_depth` to 0 to log only the class and repr lines.
+    """
     if obj is None:
         return
     logger.log(
@@ -818,7 +867,7 @@ def log_instance_dict(
 
     Notes:
         - Empty mappings are ignored.
-        - Each entry is logged via `_log_component`, which emits a class line,
+        - Each entry is logged via `log_component`, which emits a class line,
           a repr line, and selected public attributes.
 
     Examples:
@@ -836,7 +885,7 @@ def log_instance_dict(
     if not entries:
         return
     for key, value in entries.items():
-        _log_component(
+        log_component(
             logger,
             kind=kind,
             label=str(key),
