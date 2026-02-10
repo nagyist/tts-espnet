@@ -65,7 +65,6 @@ def resolve_stages(
 def run_stages(
     system: Any,
     stages_to_run: Iterable[str],
-    *,
     dry_run: bool = False,
     log: logging.Logger | None = None,
     on_stage_start: Callable[[str, logging.Logger], None] | None = None,
@@ -125,7 +124,6 @@ def run_stages(
                 )
 
             set_stage_log_handler(
-                log,
                 Path(log_dir) if log_dir else None,
                 filename=filename,
             )

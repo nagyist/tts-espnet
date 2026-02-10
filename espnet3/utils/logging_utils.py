@@ -70,7 +70,6 @@ def _get_next_rotated_log_path(target: Path) -> Path:
 
 
 def configure_logging(
-    *,
     log_dir: Path | None = None,
     level: int = logging.INFO,
     filename: str = "run.log",
@@ -146,9 +145,7 @@ def configure_logging(
 
 
 def set_stage_log_handler(
-    logger: logging.Logger,
     log_dir: Path | None,
-    *,
     filename: str,
 ) -> Path | None:
     """Attach a file handler for a stage log, replacing any prior stage handler.
@@ -309,7 +306,6 @@ def _write_requirements_snapshot(logger: logging.Logger) -> None:
 
 def log_run_metadata(
     logger: logging.Logger,
-    *,
     argv: Iterable[str] | None = None,
     configs: Mapping[str, Path | None] | None = None,
     write_requirements: bool = False,
@@ -410,7 +406,6 @@ def log_run_metadata(
 # Environment Metadata (Cluster/Runtime/Torch)
 # =============================================================================
 def _collect_env(
-    *,
     prefixes: Iterable[str] | None = None,
     keys: Iterable[str] | None = None,
 ) -> dict[str, str]:
@@ -434,7 +429,6 @@ def _collect_env(
 
 def log_env_metadata(
     logger: logging.Logger,
-    *,
     cluster_prefixes: Iterable[str] | None = None,
     runtime_prefixes: Iterable[str] | None = None,
     runtime_keys: Iterable[str] | None = None,
@@ -662,7 +656,7 @@ def _iter_attrs(obj) -> Iterable[tuple[str, object]]:
     )
 
 
-def _truncate_text(text: str, *, max_len: int = 200) -> str:
+def _truncate_text(text: str, max_len: int = 200) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 3] + "..."
@@ -783,7 +777,6 @@ def _log_component(
 
 def log_instance_dict(
     logger: logging.Logger,
-    *,
     kind: str,
     entries: dict[str, object],
     max_depth: int = 2,

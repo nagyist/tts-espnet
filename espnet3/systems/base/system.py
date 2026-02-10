@@ -32,7 +32,6 @@ class BaseSystem:
 
     def __init__(
         self,
-        *,
         train_config: DictConfig | None = None,
         infer_config: DictConfig | None = None,
         metric_config: DictConfig | None = None,

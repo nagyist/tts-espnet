@@ -149,9 +149,9 @@ class TrainBatchMetricsLogger(Callback):
 
     Example log output:
         20epoch:train:4201-4400batch: iter_time=6.212e-05, forward_time=0.145, \
-backward_time=0.159, optim_step_time=0.015, train_time=0.562, \
-loss_ctc=69.86, loss_att=32.128, acc=0.868, loss=46.669, \
-optim0_lr0=2.458e-06
+            backward_time=0.159, optim_step_time=0.015, train_time=0.562, \
+            loss_ctc=69.86, loss_att=32.128, acc=0.868, loss=46.669, \
+            optim0_lr0=2.458e-06
     """
 
     def __init__(self, log_every_n_steps: int = 500):

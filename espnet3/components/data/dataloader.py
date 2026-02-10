@@ -184,7 +184,7 @@ class DataLoaderBuilder:
             return self._build_iter_factory(factory_config, mode=mode)
         return self._build_standard_dataloader(config, mode=mode)
 
-    def _build_standard_dataloader(self, dataloader_config, dataset=None, *, mode: str):
+    def _build_standard_dataloader(self, dataloader_config, dataset=None, mode="train"):
         if dataset is None:
             dataset = self.dataset
 
@@ -218,7 +218,7 @@ class DataLoaderBuilder:
         )
         return loader
 
-    def _build_iter_factory(self, factory_config, dataset=None, *, mode: str):
+    def _build_iter_factory(self, factory_config, dataset=None, mode="train"):
         if dataset is None:
             dataset = self.dataset
 
@@ -273,7 +273,7 @@ class DataLoaderBuilder:
         )
         return iterator
 
-    def _build_multiple_iterator(self, factory_config, *, mode: str):
+    def _build_multiple_iterator(self, factory_config, mode="train"):
         assert self.dataset.multiple_iterator, (
             "All dataset must be a subclass of"
             "espnet3.components.data.dataset.ShardedDataset"

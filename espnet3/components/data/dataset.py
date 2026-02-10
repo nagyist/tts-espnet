@@ -7,7 +7,7 @@ from typing import Any, Callable, List, Tuple
 from torch.utils.data.dataset import Dataset
 
 
-def _truncate_text(text: str, *, max_len: int = 200) -> str:
+def _truncate_text(text: str, max_len: int = 200) -> str:
     if len(text) <= max_len:
         return text
     return text[: max_len - 3] + "..."

@@ -20,7 +20,7 @@ class InferenceProvider(EnvironmentProvider, ABC):
     per-worker setup. Instances cache a local environment for reuse.
     """
 
-    def __init__(self, config: DictConfig, *, params: Optional[Dict[str, Any]] = None):
+    def __init__(self, config: DictConfig, params: Optional[Dict[str, Any]] = None):
         """Initialize the provider and prebuild the local environment.
 
         Args:

@@ -128,7 +128,7 @@ class BaseRunner(ABC):
         - Keeping ``forward`` as a ``@staticmethod`` for pickle-safety.
 
     Subclass contract:
-        - Implement ``@staticmethod forward(idx, *, dataset, model, **env) -> Any``
+        - Implement ``@staticmethod forward(idx, dataset, model, **env) -> Any``
           without capturing ``self``. ``idx`` may be a single index or a batch
           of indices depending on ``batch_size``.
         - Provide an :class:`EnvironmentProvider` that builds the required env
@@ -155,7 +155,6 @@ class BaseRunner(ABC):
     def __init__(
         self,
         provider: EnvironmentProvider,
-        *,
         batch_size: int | None = None,
         async_mode: bool = False,
         async_specs_dir: str | Path = "./_async_specs",
@@ -170,7 +169,7 @@ class BaseRunner(ABC):
 
     @staticmethod
     @abstractmethod
-    def forward(idx: int | Iterable[int], *, dataset, model, **env) -> Any:
+    def forward(idx: int | Iterable[int], dataset, model, **env) -> Any:
         """Compute items for the given index or batch (to be implemented by subclasses).
 
         Keep this as a ``@staticmethod`` so that it is pickle-safe for Dask
@@ -191,7 +190,7 @@ class BaseRunner(ABC):
         Example:
             >>> class MyRunner(BaseRunner):
             ...     @staticmethod
-            ...     def forward(idx, *, dataset, model, **env):
+            ...     def forward(idx, dataset, model, **env):
             ...         if isinstance(idx, int):
             ...             x = dataset[idx]
             ...             return model(x)
