@@ -1,5 +1,6 @@
 """DataOrganizer class for managing datasets in ESPnet3."""
 
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional, Union
 
@@ -8,30 +9,9 @@ from omegaconf import DictConfig
 
 from espnet2.train.preprocessor import AbsPreprocessor
 from espnet3.components.data.dataset import CombinedDataset, DatasetWithTransform
+from espnet3.utils.logging_utils import build_callable_name, build_qualified_name
 
-
-def _truncate_text(text: str, *, max_len: int = 200) -> str:
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 3] + "..."
-
-
-def _qualified_name(obj: Any) -> str:
-    cls = obj.__class__
-    if cls.__module__ == "builtins":
-        if hasattr(obj, "__len__"):
-            try:
-                return f"{cls.__name__}(len={len(obj)})"
-            except Exception:
-                pass
-        return _truncate_text(str(obj))
-    return f"{cls.__module__}.{cls.__qualname__}"
-
-
-def _callable_name(func: Any) -> str:
-    if hasattr(func, "__qualname__") and hasattr(func, "__module__"):
-        return f"{func.__module__}.{func.__qualname__}"
-    return _qualified_name(func)
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -228,27 +208,47 @@ class DataOrganizer:
         return self.test_sets
 
     def __repr__(self) -> str:
+        """Return a compact, human-readable representation for debugging."""
         train_desc = (
-            f"{_qualified_name(self.train)}(len={len(self.train)})"
+            f"{build_qualified_name(self.train)}(len={len(self.train)})"
             if self.train is not None
             else "None"
         )
         valid_desc = (
-            f"{_qualified_name(self.valid)}(len={len(self.valid)})"
+            f"{build_qualified_name(self.valid)}(len={len(self.valid)})"
             if self.valid is not None
             else "None"
         )
         test_entries = []
         for name, dataset in self.test_sets.items():
             test_entries.append(
-                f"{name}: {_qualified_name(dataset)}(len={len(dataset)})"
+                f"{name}: {build_qualified_name(dataset)}(len={len(dataset)})"
             )
         tests_desc = ", ".join(test_entries) if test_entries else "None"
         return (
             f"{self.__class__.__name__}("
-            f"preprocessor={_callable_name(self.preprocessor)}, "
+            f"preprocessor={build_callable_name(self.preprocessor)}, "
             f"train={train_desc}, "
             f"valid={valid_desc}, "
             f"test={tests_desc}"
             f")"
         )
+
+    def log_summary(self, log: logging.Logger | None = None) -> None:
+        """Log a concise dataset summary."""
+        log = log or logger
+        log.info("Data organizer: %s", build_qualified_name(self))
+        if self.train is None:
+            log.info("train dataset: None")
+        else:
+            log.info("train dataset: %s", build_qualified_name(self.train))
+        if self.valid is None:
+            log.info("valid dataset: None")
+        else:
+            log.info("valid dataset: %s", build_qualified_name(self.valid))
+        if not self.test_sets:
+            log.info("test datasets: None")
+            return
+        log.info("test datasets: %d", len(self.test_sets))
+        for name, ds in self.test_sets.items():
+            log.info("test[%s] dataset: %s", name, build_qualified_name(ds))

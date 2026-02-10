@@ -13,11 +13,8 @@ from espnet3.components.data.collect_stats import collect_stats
 from espnet3.components.data.dataloader import DataLoaderBuilder
 from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 from espnet3.components.optimizers.multiple_scheduler import MultipleScheduler
-from espnet3.utils.logging_utils import (
-    log_data_organizer,
-    log_stage,
-    log_training_summary,
-)
+from espnet3.utils.logging_utils import _log_component, log_stage
+from humanfriendly import format_number, format_size
 
 logger = logging.getLogger("lightning")
 
@@ -52,7 +49,7 @@ class ESPnetLightningModule(lightning.LightningModule):
         self.model = model
         data_organizer = instantiate(config.dataset)
 
-        log_data_organizer(logger, data_organizer)
+        data_organizer.log_summary(logger)
         self.train_dataset = data_organizer.train
         self.valid_dataset = data_organizer.valid
         self.nan_countdown = 0
@@ -355,7 +352,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 "`schedulers`"
             )
 
-        log_training_summary(
+        self._log_training_summary(
             logger,
             self.model,
             optimizer=optimizer,
@@ -369,6 +366,134 @@ class ESPnetLightningModule(lightning.LightningModule):
                 "interval": "step",  # assuming lr scheduler is updated per step
             },
         }
+
+    @staticmethod
+    def _log_training_summary(
+        logger: logging.Logger,
+        model,
+        optimizer=None,
+        scheduler=None,
+    ) -> None:
+        """Log model/optimizer/scheduler details for training runs.
+
+        Description:
+            Emits a compact summary of the model, parameter counts, dtype
+            composition, and optimizer/scheduler configuration. This mirrors the
+            previous utility implementation but keeps logging close to where
+            the training loop is configured.
+
+        Args:
+            logger (logging.Logger): Logger used to emit messages.
+            model: PyTorch model to summarize.
+            optimizer: Optimizer instance or wrapper.
+            scheduler: Scheduler instance or list of schedulers.
+
+        Returns:
+            None
+
+        Notes:
+            - Uses `format_number` and `format_size` to improve readability.
+            - The summary is logged at INFO level.
+
+        Examples:
+            ```python
+            self._log_training_summary(logger, self.model, optimizer, scheduler)
+            ```
+
+            Sample output:
+            ```
+            Model summary:
+                Class Name: DummyModel
+                Total Number of model parameters: 1,024
+                Trainable model parameters: 1,024 (100.0%)
+                Model size: 4.0 KB
+                DType composition: torch.float32(100.0%)
+            Optimizer[0]:
+            Scheduler[0]:
+            ```
+
+        Raises:
+            None
+        """
+        logger.log(logging.INFO, "Model:\n%r", model, stacklevel=2)
+
+        params = list(model.parameters())
+        total_params = sum(p.numel() for p in params)
+        trainable_params = sum(p.numel() for p in params if p.requires_grad)
+        size_bytes = sum(p.numel() * p.element_size() for p in params)
+
+        dtype_counts: dict[str, int] = {}
+        for p in params:
+            dtype_counts[str(p.dtype)] = dtype_counts.get(str(p.dtype), 0) + p.numel()
+        dtype_items = sorted(dtype_counts.items(), key=lambda kv: kv[1], reverse=True)
+        dtype_desc = ", ".join(
+            f"{k}({v / total_params * 100:.1f}%)" for k, v in dtype_items
+        )
+
+        logger.log(logging.INFO, "Model summary:", stacklevel=2)
+        logger.log(
+            logging.INFO, "    Class Name: %s", type(model).__name__, stacklevel=2
+        )
+        logger.log(
+            logging.INFO,
+            "    Total Number of model parameters: %s",
+            format_number(total_params),
+            stacklevel=2,
+        )
+        logger.log(
+            logging.INFO,
+            "    Trainable model parameters: %s (%.1f%%)",
+            format_number(trainable_params),
+            (trainable_params / total_params * 100.0) if total_params else 0.0,
+            stacklevel=2,
+        )
+        logger.log(
+            logging.INFO,
+            "    Model size: %s",
+            format_size(size_bytes),
+            stacklevel=2,
+        )
+        logger.log(
+            logging.INFO,
+            "    DType composition: %s",
+            dtype_desc,
+            stacklevel=2,
+        )
+
+        if optimizer is None and scheduler is None:
+            return
+
+        if isinstance(optimizer, MultipleOptimizer):
+            optimizers = list(optimizer.optimizers)
+        elif isinstance(optimizer, list):
+            optimizers = optimizer
+        else:
+            optimizers = [optimizer]
+        for idx, optim in enumerate(optimizers):
+            logger.log(logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
+            _log_component(
+                logger,
+                kind="Optimizer",
+                label=str(idx),
+                obj=optim,
+                max_depth=2,
+            )
+
+        if scheduler is None:
+            return
+        if isinstance(scheduler, list):
+            schedulers = scheduler
+        else:
+            schedulers = [scheduler]
+        for idx, sch in enumerate(schedulers):
+            logger.log(logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
+            _log_component(
+                logger,
+                kind="Scheduler",
+                label=str(idx),
+                obj=sch,
+                max_depth=2,
+            )
 
     def train_dataloader(self):
         """Build the training DataLoader using ESPnet's DataLoaderBuilder.

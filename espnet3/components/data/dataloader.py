@@ -10,10 +10,36 @@ from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from espnet2.samplers.build_batch_sampler import build_batch_sampler
-from espnet3.utils.logging_utils import log_dataloader
+from espnet3.utils.logging_utils import _dump_attrs, build_qualified_name
 
 logger = logging.getLogger(__name__)
 _LOGGED_DISTRIBUTED_BATCHES: set[str] = set()
+_LOGGED_DATALOADER: bool = False
+
+
+def log_dataloader(logger: logging.Logger, loader, label: str) -> None:
+    """Log dataloader/iterator details once per process."""
+    # Log only once in the process
+    global _LOGGED_DATALOADER
+    if _LOGGED_DATALOADER:
+        return
+    _LOGGED_DATALOADER = True
+
+    logger.log(
+        logging.INFO,
+        "DataLoader[%s] class: %s",
+        label,
+        build_qualified_name(loader),
+        stacklevel=2,
+    )
+    _dump_attrs(
+        logger,
+        loader,
+        indent="  ",
+        depth=0,
+        max_depth=2,
+        seen=set(),
+    )
 
 
 def update_shard(config: Union[dict, list], shard_idx: int) -> Union[dict, list]:
@@ -189,8 +215,6 @@ class DataLoaderBuilder:
             logger,
             loader,
             label=mode,
-            sampler=sampler,
-            batch_sampler=batch_sampler,
         )
         return loader
 
@@ -246,8 +270,6 @@ class DataLoaderBuilder:
             logger,
             iterator,
             label=mode,
-            iter_factory=iter_factory,
-            batches=batches,
         )
         return iterator
 

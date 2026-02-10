@@ -46,6 +46,9 @@ class BaseSystem:
             self.exp_dir.mkdir(parents=True, exist_ok=True)
         else:
             self.exp_dir = None
+        self.stage_log_dirs = self._get_stage_log_dirs()
+        for path in {p for p in self.stage_log_dirs.values() if p is not None}:
+            path.mkdir(parents=True, exist_ok=True)
         logger.info(
             "Initialized %s with train_config=%s infer_config=%s "
             "metric_config=%s exp_dir=%s",
@@ -55,6 +58,28 @@ class BaseSystem:
             metric_config is not None,
             self.exp_dir,
         )
+
+    def _get_stage_log_dirs(self) -> dict[str, Path]:
+        """Return a mapping of stage names to log directories.
+
+        BaseSystem treats all stages uniformly and writes logs into:
+          - ``train_config.exp_dir`` when available, or
+          - ``<cwd>/logs`` as a fallback when no experiment directory is set.
+
+        Subclasses can override this method to route specific stages to
+        stage-aware artifact locations (e.g., dataset or decode outputs).
+
+        Args:
+            None
+
+        Returns:
+            dict[str, Path]: Mapping from stage name to log directory.
+        """
+        if self.exp_dir is not None:
+            default_dir = self.exp_dir
+        else:
+            default_dir = Path.cwd() / "logs"
+        return {"default": default_dir}
 
     @staticmethod
     def _reject_stage_args(stage: str, args, kwargs) -> None:

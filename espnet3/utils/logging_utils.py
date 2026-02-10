@@ -17,10 +17,7 @@ from shutil import which
 from typing import Mapping
 
 import torch
-from humanfriendly import format_number, format_size
 
-from espnet3.components.data.dataset import CombinedDataset, DatasetWithTransform
-from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 
 LOG_FORMAT = (
     "[%(hostname)s] %(asctime)s (%(filename)s:%(lineno)d) "
@@ -32,7 +29,6 @@ DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
 # Logging Record Setup
 # =============================================================================
 _LOG_STAGE = contextvars.ContextVar("espnet3_log_stage", default="main")
-_LOGGED_DATALOADER: bool = False
 _BASE_RECORD_FACTORY = logging.getLogRecordFactory()
 
 
@@ -148,6 +144,55 @@ def configure_logging(
 
     logging.captureWarnings(True)
     return logging.getLogger("espnet3")
+
+
+def set_stage_log_handler(
+    logger: logging.Logger,
+    log_dir: Path | None,
+    *,
+    filename: str,
+) -> Path | None:
+    """Attach a file handler for a stage log, replacing any prior stage handler.
+
+    This function adds a new file handler to the root logger and removes any
+    previously installed stage handler (identified via ``_espnet3_stage_log``).
+    If a log file already exists at the target path, it is rotated (e.g.,
+    ``train.log`` -> ``train1.log``) before creating the new handler.
+
+    Args:
+        logger (logging.Logger): Logger used to emit logs.
+            The handler is attached to the root logger so the logger hierarchy
+            continues to work as expected.
+        log_dir (Path | None): Directory that should receive the stage log.
+            If None, no handler is installed and None is returned.
+        filename (str): Log filename to create within ``log_dir``.
+
+    Returns:
+        Path | None: Resolved log file path when installed, otherwise None.
+    """
+    if log_dir is None:
+        return None
+
+    log_dir.mkdir(parents=True, exist_ok=True)
+    target = (log_dir / filename).resolve()
+
+    root = logging.getLogger()
+    for handler in list(root.handlers):
+        if getattr(handler, "_espnet3_stage_log", False):
+            root.removeHandler(handler)
+            handler.close()
+
+    formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT)
+    if target.exists():
+        rotated = _get_next_rotated_log_path(target)
+        os.replace(target, rotated)
+
+    file_handler = logging.FileHandler(target)
+    file_handler.setFormatter(formatter)
+    file_handler._espnet3_stage_log = True
+    root.addHandler(file_handler)
+
+    return target
 
 
 # =============================================================================
@@ -530,13 +575,37 @@ def log_env_metadata(
 # =============================================================================
 # Introspection Helpers
 # =============================================================================
-def _build_qualified_name(obj) -> str:
-    """Return fully-qualified class name for an object or class.
+def build_qualified_name(obj) -> str:
+    """Return a compact, fully-qualified name for objects or classes.
 
-    Example:
+    Description:
+        Produces a stable, human-readable identifier for logging and debugging.
+        For objects, it prefers the object's class path. For builtins without a
+        module path, it falls back to a truncated string, and includes length
+        when available.
+
+    Args:
+        obj: Any object or class.
+
+    Returns:
+        str: A fully-qualified name or a compact string representation.
+
+    Notes:
+        - Builtin types (e.g., list, dict) return "ListClass(len=...)" when
+          possible, otherwise a truncated string.
+        - For classes, the class module and name are returned.
+
+    Examples:
         ```python
-        _build_qualified_name(Path("/tmp"))
+        from pathlib import Path
+        build_qualified_name(Path("/tmp"))
         # => 'pathlib.PosixPath'
+
+        build_qualified_name(Path)
+        # => 'pathlib.Path'
+
+        build_qualified_name([1, 2, 3])
+        # => 'list(len=3)'
         ```
     """
     cls = obj if isinstance(obj, type) else type(obj)
@@ -548,6 +617,41 @@ def _build_qualified_name(obj) -> str:
                 pass
         return _truncate_text(str(obj))
     return f"{cls.__module__}.{cls.__name__}"
+
+
+def build_callable_name(func) -> str:
+    """Return a fully-qualified name for callables when possible.
+
+    Description:
+        Uses module + qualname for callables (functions, methods, classes with
+        __call__). Falls back to build_qualified_name for non-standard callables.
+
+    Args:
+        func: Callable object or any object that may be callable.
+
+    Returns:
+        str: A fully-qualified callable name if available, else a fallback name.
+
+    Notes:
+        - For functions and methods, uses __module__ + __qualname__.
+        - For callable instances without __qualname__, falls back to
+          build_qualified_name.
+
+    Examples:
+        ```python
+        def my_fn(x): ...
+        build_callable_name(my_fn)
+        # => 'my_module.my_fn'
+
+        class MyClass:
+            def __call__(self, x): ...
+        build_callable_name(MyClass())
+        # => 'my_module.MyClass'
+        ```
+    """
+    if hasattr(func, "__qualname__") and hasattr(func, "__module__"):
+        return f"{func.__module__}.{func.__qualname__}"
+    return build_qualified_name(func)
 
 
 def _iter_attrs(obj) -> Iterable[tuple[str, object]]:
@@ -598,7 +702,7 @@ def _dump_attrs(
                 "%s%s: %s",
                 indent,
                 key,
-                _build_qualified_name(value),
+                build_qualified_name(value),
                 stacklevel=3,
             )
             continue
@@ -637,7 +741,7 @@ def _dump_attrs(
             "%s%s: %s",
             indent,
             key,
-            _build_qualified_name(value),
+            build_qualified_name(value),
             stacklevel=3,
         )
         _dump_attrs(
@@ -664,7 +768,7 @@ def _log_component(
         "%s[%s] class: %s",
         kind,
         label,
-        _build_qualified_name(obj),
+        build_qualified_name(obj),
         stacklevel=2,
     )
     logger.log(logging.INFO, "%s[%s]: %r", kind, label, obj, stacklevel=2)
@@ -685,6 +789,40 @@ def log_instance_dict(
     entries: dict[str, object],
     max_depth: int = 2,
 ) -> None:
+    """Log a dictionary of instances with a common kind label.
+
+    Description:
+        Iterates over the provided mapping and logs each value using the shared
+        `kind` label. This is useful for dumping collections of structured
+        objects (e.g., environment info blocks or component registries) in a
+        consistent, readable format.
+
+    Args:
+        logger (logging.Logger): Logger used to emit messages.
+        kind (str): Label prefix for each entry (e.g., "Env", "Component").
+        entries (dict[str, object]): Mapping from entry keys to objects.
+        max_depth (int): Maximum depth for attribute dumping.
+
+    Returns:
+        None
+
+    Notes:
+        - Empty mappings are ignored.
+        - Each entry is logged via `_log_component`, which emits a class line,
+          a repr line, and selected public attributes.
+
+    Examples:
+        ```python
+        log_instance_dict(
+            logger,
+            kind="Env",
+            entries={"CUDA": torch.cuda, "NCCL": nccl_module},
+        )
+        ```
+
+    Raises:
+        None
+    """
     if not entries:
         return
     for key, value in entries.items():
@@ -695,172 +833,3 @@ def log_instance_dict(
             obj=value,
             max_depth=max_depth,
         )
-
-
-# =============================================================================
-# Model/Optimizer Summary
-# =============================================================================
-def log_training_summary(
-    logger: logging.Logger,
-    model,
-    optimizer=None,
-    scheduler=None,
-) -> None:
-    """Log model architecture/summary and optimizer/scheduler details."""
-    logger.log(logging.INFO, "Model:\n%r", model, stacklevel=2)
-
-    params = list(model.parameters())
-    total_params = sum(p.numel() for p in params)
-    trainable_params = sum(p.numel() for p in params if p.requires_grad)
-    size_bytes = sum(p.numel() * p.element_size() for p in params)
-
-    dtype_counts: dict[str, int] = {}
-    for p in params:
-        dtype_counts[str(p.dtype)] = dtype_counts.get(str(p.dtype), 0) + p.numel()
-    dtype_items = sorted(dtype_counts.items(), key=lambda kv: kv[1], reverse=True)
-    dtype_desc = ", ".join(
-        f"{k}({v / total_params * 100:.1f}%)" for k, v in dtype_items
-    )
-
-    logger.log(logging.INFO, "Model summary:", stacklevel=2)
-    logger.log(logging.INFO, "    Class Name: %s", type(model).__name__, stacklevel=2)
-    logger.log(
-        logging.INFO,
-        "    Total Number of model parameters: %s",
-        format_number(total_params),
-        stacklevel=2,
-    )
-    logger.log(
-        logging.INFO,
-        "    Number of trainable parameters: %s (%.1f%%)",
-        format_number(trainable_params),
-        (trainable_params / total_params * 100.0) if total_params else 0.0,
-        stacklevel=2,
-    )
-    logger.log(logging.INFO, "    Size: %s", format_size(size_bytes), stacklevel=2)
-    logger.log(logging.INFO, "    Type: %s", dtype_desc, stacklevel=2)
-
-    optimizers = []
-    if isinstance(optimizer, MultipleOptimizer):
-        optimizers = list(optimizer.optimizers)
-    else:
-        optimizers = [optimizer]
-
-    for idx, optim in enumerate(optimizers):
-        logger.log(logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
-        _log_component(
-            logger,
-            kind="Optimizer",
-            label=str(idx),
-            obj=optim,
-            max_depth=2,
-        )
-
-    if isinstance(scheduler, list):
-        schedulers = scheduler
-    else:
-        schedulers = [scheduler]
-    for idx, sch in enumerate(schedulers):
-        logger.log(logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
-        _log_component(
-            logger,
-            kind="Scheduler",
-            label=str(idx),
-            obj=sch,
-            max_depth=2,
-        )
-
-
-# =============================================================================
-# Dataset/Data Organizer Logging
-# =============================================================================
-def _log_dataset(
-    logger: logging.Logger,
-    dataset,
-    *,
-    label: str,
-    indent: str = "  ",
-    depth: int = 0,
-) -> None:
-    logger.log(
-        logging.INFO,
-        "%s%s class: %s",
-        indent * depth,
-        label,
-        _build_qualified_name(dataset),
-        stacklevel=3,
-    )
-    _dump_attrs(
-        logger,
-        dataset,
-        indent=indent * (depth + 1),
-        depth=0,
-        max_depth=2,
-        seen=set(),
-    )
-
-
-def log_data_organizer(logger: logging.Logger, data_organizer) -> None:
-    """Log dataset organizer and dataset details."""
-    logger.log(
-        logging.INFO,
-        "Data organizer: %s",
-        _build_qualified_name(data_organizer),
-        stacklevel=2,
-    )
-
-    train = getattr(data_organizer, "train", None)
-    valid = getattr(data_organizer, "valid", None)
-    test = getattr(data_organizer, "test", None)
-
-    if train is None:
-        logger.log(logging.INFO, "train dataset: None", stacklevel=2)
-    else:
-        _log_dataset(logger, train, label="train")
-
-    if valid is None:
-        logger.log(logging.INFO, "valid dataset: None", stacklevel=2)
-    else:
-        _log_dataset(logger, valid, label="valid")
-
-    if not test:
-        logger.log(logging.INFO, "test datasets: None", stacklevel=2)
-        return
-
-    if isinstance(test, dict):
-        logger.log(logging.INFO, "test datasets: %d", len(test), stacklevel=2)
-        for name, ds in test.items():
-            _log_dataset(logger, ds, label=f"test[{name}]")
-    else:
-        _log_dataset(logger, test, label="test")
-
-
-def log_dataloader(
-    logger: logging.Logger,
-    loader,
-    label: str,
-    sampler=None,
-    batch_sampler=None,
-    iter_factory=None,
-    batches=None,
-) -> None:
-    """Log dataloader/iterator details including samplers and iter factories."""
-    global _LOGGED_DATALOADER
-    if _LOGGED_DATALOADER:
-        return
-    _LOGGED_DATALOADER = True
-    logger.log(
-        logging.INFO,
-        "DataLoader[%s] class: %s",
-        label,
-        _build_qualified_name(loader),
-        stacklevel=2,
-    )
-    _dump_attrs(
-        logger,
-        loader,
-        indent="  ",
-        depth=0,
-        max_depth=2,
-        seen=set(),
-    )
