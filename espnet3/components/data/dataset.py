@@ -7,6 +7,41 @@ from typing import Any, Callable, List, Tuple
 from torch.utils.data.dataset import Dataset
 
 
+def _truncate_text(text: str, *, max_len: int = 200) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3] + "..."
+
+
+def _qualified_name(obj: Any) -> str:
+    cls = obj.__class__
+    if cls.__module__ == "builtins":
+        if hasattr(obj, "__len__"):
+            try:
+                return f"{cls.__name__}(len={len(obj)})"
+            except Exception:
+                pass
+        return _truncate_text(str(obj))
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def _callable_name(func: Any) -> str:
+    if hasattr(func, "__qualname__") and hasattr(func, "__module__"):
+        return f"{func.__module__}.{func.__qualname__}"
+    return _qualified_name(func)
+
+
+def _dataset_extra(obj: Any) -> str:
+    extras = []
+    split = getattr(obj, "split", None)
+    name = getattr(obj, "name", None)
+    if split is not None:
+        extras.append(f"split={split!r}")
+    if name is not None:
+        extras.append(f"name={name!r}")
+    return ", ".join(extras)
+
+
 class CombinedDataset:
     """Combines multiple datasets into a single unified dataset-like interface.
 
@@ -181,6 +216,28 @@ class CombinedDataset:
             self.use_espnet_preprocessor,
         )
 
+    def __repr__(self) -> str:
+        entries = []
+        for idx, (dataset, (transform, preprocessor)) in enumerate(
+            zip(self.datasets, self.transforms)
+        ):
+            extra = _dataset_extra(dataset)
+            extra = f", {extra}" if extra else ""
+            entries.append(
+                f"{idx}: {_qualified_name(dataset)}(len={len(dataset)}{extra}) "
+                f"transform={_callable_name(transform)} "
+                f"preprocessor={_callable_name(preprocessor)}"
+            )
+        datasets_desc = ", ".join(entries)
+        return (
+            f"{self.__class__.__name__}("
+            f"total_len={len(self)}, "
+            f"use_espnet_preprocessor={self.use_espnet_preprocessor}, "
+            f"multiple_iterator={self.multiple_iterator}, "
+            f"datasets=[{datasets_desc}]"
+            f")"
+        )
+
 
 class DatasetWithTransform:
     """Lightweight wrapper for applying a transform function to dataset items.
@@ -250,6 +307,18 @@ class DatasetWithTransform:
     def __call__(self, idx):
         """Alias for __getitem__ to allow callable access."""
         return self.__getitem__(idx)
+
+    def __repr__(self) -> str:
+        extra = _dataset_extra(self.dataset)
+        extra = f", {extra}" if extra else ""
+        return (
+            f"{self.__class__.__name__}("
+            f"dataset={_qualified_name(self.dataset)}(len={len(self.dataset)}{extra}), "
+            f"transform={_callable_name(self.transform)}, "
+            f"preprocessor={_callable_name(self.preprocessor)}, "
+            f"use_espnet_preprocessor={self.use_espnet_preprocessor}"
+            f")"
+        )
 
 
 class ShardedDataset(ABC, Dataset):

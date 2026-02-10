@@ -1,13 +1,17 @@
 """Calculate metrics entrypoint for hypothesis/reference outputs."""
 
 import json
+import logging
 from pathlib import Path
 
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
 from espnet3.components.metrics.abs_metric import AbsMetric
+from espnet3.utils.logging_utils import _log_component
 from espnet3.utils.scp_utils import get_cls_path, load_scp_fields
+
+logger = logging.getLogger(__name__)
 
 
 def metric(metrics_config: DictConfig):
@@ -23,11 +27,18 @@ def metric(metrics_config: DictConfig):
     results = {}
     assert hasattr(metrics_config, "metrics"), "Please specify `metrics`!"
 
-    for metric_config in metrics_config.metrics:
+    for idx, metric_config in enumerate(metrics_config.metrics):
         metric = instantiate(metric_config.metric)
         if not isinstance(metric, AbsMetric):
             raise TypeError(f"{type(metric)} is not a valid AbsMetric instance")
 
+        _log_component(
+            logger,
+            kind="Metric",
+            label=str(idx),
+            obj=metric,
+            max_depth=2,
+        )
         results[get_cls_path(metric)] = {}
         for test_name in test_sets:
             if hasattr(metric_config, "inputs"):

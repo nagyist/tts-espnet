@@ -540,21 +540,14 @@ def _build_qualified_name(obj) -> str:
         ```
     """
     cls = obj if isinstance(obj, type) else type(obj)
+    if not isinstance(obj, type) and cls.__module__ == "builtins":
+        if hasattr(obj, "__len__"):
+            try:
+                return f"{cls.__name__}(len={len(obj)})"
+            except Exception:
+                pass
+        return _truncate_text(str(obj))
     return f"{cls.__module__}.{cls.__name__}"
-
-
-def _build_callable_name(fn) -> str:
-    """Return fully-qualified callable name when possible.
-
-    Example:
-        ```python
-        _build_callable_name(len)
-        # => 'builtins.len'
-        ```
-    """
-    if hasattr(fn, "__module__") and hasattr(fn, "__name__"):
-        return f"{fn.__module__}.{fn.__name__}"
-    return _build_qualified_name(fn)
 
 
 def _iter_attrs(obj) -> Iterable[tuple[str, object]]:
@@ -589,6 +582,16 @@ def _dump_attrs(
     seen.add(obj_id)
 
     for key, value in _iter_attrs(obj):
+        if isinstance(value, torch.utils.data.Dataset):
+            logger.log(
+                logging.INFO,
+                "%s%s: %r",
+                indent,
+                key,
+                value,
+                stacklevel=3,
+            )
+            continue
         if isinstance(value, torch.nn.Module):
             logger.log(
                 logging.INFO,
@@ -664,7 +667,7 @@ def _log_component(
         _build_qualified_name(obj),
         stacklevel=2,
     )
-    logger.log(logging.INFO, "%s[%s]: %s", kind, label, obj, stacklevel=2)
+    logger.log(logging.INFO, "%s[%s]: %r", kind, label, obj, stacklevel=2)
     _dump_attrs(
         logger,
         obj,
@@ -675,35 +678,28 @@ def _log_component(
     )
 
 
+def log_instance_dict(
+    logger: logging.Logger,
+    *,
+    kind: str,
+    entries: dict[str, object],
+    max_depth: int = 2,
+) -> None:
+    if not entries:
+        return
+    for key, value in entries.items():
+        _log_component(
+            logger,
+            kind=kind,
+            label=str(key),
+            obj=value,
+            max_depth=max_depth,
+        )
+
+
 # =============================================================================
 # Model/Optimizer Summary
 # =============================================================================
-def _summarize_param_modules(model, params: Iterable) -> str | None:
-    """Summarize parameter distribution by top-level module name.
-
-    Note: We derive `params` from the optimizer (not from `model.parameters()`)
-    so the summary reflects the parameters actually optimized, which matters
-    when multiple optimizers or frozen parameter subsets are used.
-    """
-    param_name_map = {id(p): name for name, p in model.named_parameters()}
-
-    counts: dict[str, int] = {}
-    total = 0
-    for p in params:
-        numel = int(p.numel())
-        total += numel
-        name = param_name_map[id(p)]
-        key = name.split(".", 1)[0]
-        counts[key] = counts.get(key, 0) + numel
-
-    if total == 0:
-        return None
-
-    items = sorted(counts.items(), key=lambda kv: kv[1], reverse=True)
-    parts = [f"{k}({v / total * 100:.1f}%)" for k, v in items]
-    return ", ".join(parts)
-
-
 def log_training_summary(
     logger: logging.Logger,
     model,
@@ -711,7 +707,7 @@ def log_training_summary(
     scheduler=None,
 ) -> None:
     """Log model architecture/summary and optimizer/scheduler details."""
-    logger.log(logging.INFO, "Model:\n%s", model, stacklevel=2)
+    logger.log(logging.INFO, "Model:\n%r", model, stacklevel=2)
 
     params = list(model.parameters())
     total_params = sum(p.numel() for p in params)
@@ -752,11 +748,13 @@ def log_training_summary(
 
     for idx, optim in enumerate(optimizers):
         logger.log(logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
-        logger.log(logging.INFO, "%s", optim, stacklevel=2)
-        all_params = [p for g in optim.param_groups for p in g.get("params", [])]
-        module_summary = _summarize_param_modules(model, all_params)
-        if module_summary:
-            logger.log(logging.INFO, "    modules: %s", module_summary, stacklevel=2)
+        _log_component(
+            logger,
+            kind="Optimizer",
+            label=str(idx),
+            obj=optim,
+            max_depth=2,
+        )
 
     if isinstance(scheduler, list):
         schedulers = scheduler
@@ -764,7 +762,13 @@ def log_training_summary(
         schedulers = [scheduler]
     for idx, sch in enumerate(schedulers):
         logger.log(logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
-        logger.log(logging.INFO, "%s", sch, stacklevel=2)
+        _log_component(
+            logger,
+            kind="Scheduler",
+            label=str(idx),
+            obj=sch,
+            max_depth=2,
+        )
 
 
 # =============================================================================
@@ -778,7 +782,6 @@ def _log_dataset(
     indent: str = "  ",
     depth: int = 0,
 ) -> None:
-    prefix = indent * (depth + 1)
     logger.log(
         logging.INFO,
         "%s%s class: %s",
@@ -787,75 +790,13 @@ def _log_dataset(
         _build_qualified_name(dataset),
         stacklevel=3,
     )
-
-    if isinstance(dataset, CombinedDataset):
-        _dump_attrs(
-            logger,
-            dataset,
-            indent=prefix + "  ",
-            depth=0,
-            max_depth=2,
-            seen=set(),
-        )
-        for i, (child, (transform, preprocessor)) in enumerate(
-            zip(dataset.datasets, dataset.transforms)
-        ):
-            logger.log(logging.INFO, "%scombined[%d]:", prefix, i, stacklevel=3)
-            _log_dataset_block(
-                logger,
-                indent=indent,
-                depth=depth + 2,
-                transform=transform,
-                preprocessor=preprocessor,
-                dataset=child,
-            )
-    elif isinstance(dataset, DatasetWithTransform):
-        _log_dataset_block(
-            logger,
-            indent=indent,
-            depth=depth + 1,
-            transform=dataset.transform,
-            preprocessor=dataset.preprocessor,
-            dataset=dataset.dataset,
-        )
-
-
-def _log_dataset_block(
-    logger: logging.Logger,
-    *,
-    indent: str,
-    depth: int,
-    transform,
-    preprocessor,
-    dataset,
-) -> None:
-    logger.log(
-        logging.INFO,
-        "%stransform: %s",
-        indent * depth,
-        _build_callable_name(transform),
-        stacklevel=3,
-    )
-    logger.log(
-        logging.INFO,
-        "%spreprocessor: %s",
-        indent * depth,
-        _build_callable_name(preprocessor),
-        stacklevel=3,
-    )
-    logger.log(
-        logging.INFO,
-        "%sdataset class: %s",
-        indent * depth,
-        _build_qualified_name(dataset),
-        stacklevel=3,
-    )
-    logger.log(
-        logging.INFO,
-        "%slen: %s",
-        indent * (depth + 1),
-        len(dataset),
-        stacklevel=3,
+    _dump_attrs(
+        logger,
+        dataset,
+        indent=indent * (depth + 1),
+        depth=0,
+        max_depth=2,
+        seen=set(),
     )
 
 
@@ -908,87 +849,18 @@ def log_dataloader(
     if _LOGGED_DATALOADER:
         return
     _LOGGED_DATALOADER = True
-    dataset = loader.dataset
-    dataset_len = len(dataset)
-    dataset_desc = f"{_build_qualified_name(dataset)}(len={dataset_len})"
-
-    sampler_obj = getattr(loader, "sampler", None)
-    sampler_name = _build_qualified_name(sampler_obj) if sampler_obj is not None else "None"
-    batch_sampler_obj = getattr(loader, "batch_sampler", None)
-    batch_sampler_name = (
-        _build_qualified_name(batch_sampler_obj) if batch_sampler_obj is not None else "None"
-    )
-    collate_fn = getattr(loader, "collate_fn", None)
-    collate_name = _build_callable_name(collate_fn) if collate_fn is not None else "None"
-    multiprocessing_ctx = getattr(loader, "multiprocessing_context", None)
-    if multiprocessing_ctx is not None:
-        multiprocessing_ctx = getattr(
-            multiprocessing_ctx, "get_start_method", lambda: multiprocessing_ctx
-        )()
-
-    lines = [
-        "[DataLoader]",
-        f"  dataset           : {dataset_desc}",
-        f"  batch_size        : {loader.batch_size}",
-        f"  shuffle           : {getattr(loader, 'shuffle', None)}",
-        f"  sampler           : {sampler_name}",
-        f"  batch_sampler     : {batch_sampler_name}",
-        f"  num_workers       : {loader.num_workers}",
-        f"  drop_last         : {loader.drop_last}",
-        f"  pin_memory        : {loader.pin_memory}",
-        f"  persistent_workers: {loader.persistent_workers}",
-        f"  prefetch_factor   : {loader.prefetch_factor}",
-        f"  timeout           : {loader.timeout}",
-        f"  multiprocessing   : {multiprocessing_ctx}",
-        f"  collate_fn        : {collate_name}",
-    ]
     logger.log(
         logging.INFO,
-        "DataLoader[%s]:\n%s",
+        "DataLoader[%s] class: %s",
         label,
-        "\n".join(lines),
+        _build_qualified_name(loader),
         stacklevel=2,
     )
-
-    _log_component(
+    _dump_attrs(
         logger,
-        kind="Sampler",
-        label=label,
-        obj=sampler,
+        loader,
+        indent="  ",
+        depth=0,
         max_depth=2,
+        seen=set(),
     )
-    _log_component(
-        logger,
-        kind="BatchSampler",
-        label=label,
-        obj=batch_sampler,
-        max_depth=2,
-    )
-    _log_component(
-        logger,
-        kind="IterFactory",
-        label=label,
-        obj=iter_factory,
-        max_depth=3,
-    )
-
-    if batches is not None:
-        try:
-            batch_count = len(batches)
-        except Exception:
-            batch_count = None
-        logger.log(
-            logging.INFO,
-            "IterBatches[%s]: %s",
-            label,
-            _truncate_text(str(batches)),
-            stacklevel=2,
-        )
-        if batch_count is not None:
-            logger.log(
-                logging.INFO,
-                "IterBatches[%s]: %d batches",
-                label,
-                batch_count,
-                stacklevel=2,
-            )

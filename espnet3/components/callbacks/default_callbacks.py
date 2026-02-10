@@ -15,6 +15,9 @@ from lightning.pytorch.callbacks import (
 )
 from typeguard import typechecked
 
+from espnet3.utils.logging_utils import _log_component
+
+_LOGGED_CALLBACKS = False
 
 @typechecked
 class AverageCheckpointsCallback(Callback):
@@ -389,7 +392,7 @@ def get_default_callbacks(
     # Progress bar
     progress_bar_callback = TQDMProgressBar(refresh_rate=log_interval)
 
-    return [
+    callbacks = [
         last_ckpt_callback,
         *best_ckpt_callbacks,  # unpack list to add them to the list of callbacks.
         ave_ckpt_callback,
@@ -397,3 +400,15 @@ def get_default_callbacks(
         TrainBatchMetricsLogger(log_every_n_steps=log_interval),
         progress_bar_callback,
     ]
+    global _LOGGED_CALLBACKS
+    if not _LOGGED_CALLBACKS:
+        _LOGGED_CALLBACKS = True
+        for idx, cb in enumerate(callbacks):
+            _log_component(
+                logging.getLogger(__name__),
+                kind="Callback",
+                label=str(idx),
+                obj=cb,
+                max_depth=2,
+            )
+    return callbacks

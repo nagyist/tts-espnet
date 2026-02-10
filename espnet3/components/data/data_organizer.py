@@ -10,6 +10,30 @@ from espnet2.train.preprocessor import AbsPreprocessor
 from espnet3.components.data.dataset import CombinedDataset, DatasetWithTransform
 
 
+def _truncate_text(text: str, *, max_len: int = 200) -> str:
+    if len(text) <= max_len:
+        return text
+    return text[: max_len - 3] + "..."
+
+
+def _qualified_name(obj: Any) -> str:
+    cls = obj.__class__
+    if cls.__module__ == "builtins":
+        if hasattr(obj, "__len__"):
+            try:
+                return f"{cls.__name__}(len={len(obj)})"
+            except Exception:
+                pass
+        return _truncate_text(str(obj))
+    return f"{cls.__module__}.{cls.__qualname__}"
+
+
+def _callable_name(func: Any) -> str:
+    if hasattr(func, "__qualname__") and hasattr(func, "__module__"):
+        return f"{func.__module__}.{func.__qualname__}"
+    return _qualified_name(func)
+
+
 @dataclass
 class DatasetConfig:
     """Configuration class for dataset metadata and construction.
@@ -202,3 +226,29 @@ class DataOrganizer:
     def test(self):
         """Get the dictionary of test datasets."""
         return self.test_sets
+
+    def __repr__(self) -> str:
+        train_desc = (
+            f"{_qualified_name(self.train)}(len={len(self.train)})"
+            if self.train is not None
+            else "None"
+        )
+        valid_desc = (
+            f"{_qualified_name(self.valid)}(len={len(self.valid)})"
+            if self.valid is not None
+            else "None"
+        )
+        test_entries = []
+        for name, dataset in self.test_sets.items():
+            test_entries.append(
+                f"{name}: {_qualified_name(dataset)}(len={len(dataset)})"
+            )
+        tests_desc = ", ".join(test_entries) if test_entries else "None"
+        return (
+            f"{self.__class__.__name__}("
+            f"preprocessor={_callable_name(self.preprocessor)}, "
+            f"train={train_desc}, "
+            f"valid={valid_desc}, "
+            f"test={tests_desc}"
+            f")"
+        )
