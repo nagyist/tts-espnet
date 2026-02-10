@@ -2,8 +2,8 @@ import logging
 
 import pytest
 
-from espnet3.utils.stages_utils import resolve_stages, run_stages
 from espnet3.systems.base.system import BaseSystem
+from espnet3.utils.stages_utils import resolve_stages, run_stages
 
 
 class DummySystem:

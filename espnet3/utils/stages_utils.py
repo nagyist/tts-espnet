@@ -95,7 +95,7 @@ def run_stages(
             if dry_run:
                 log.info("[DRY RUN] would run stage: %s", stage)
                 continue
-                
+
             stage_log_dirs = system.stage_log_dirs
             log_dir = stage_log_dirs.get(stage) or stage_log_dirs.get("default")
             filename = f"{stage}.log"
