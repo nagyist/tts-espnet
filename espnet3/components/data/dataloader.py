@@ -14,16 +14,16 @@ from espnet3.utils.logging_utils import _dump_attrs, build_qualified_name
 
 logger = logging.getLogger(__name__)
 _LOGGED_DISTRIBUTED_BATCHES: set[str] = set()
-_LOGGED_DATALOADER: bool = False
+_LOGGED_DATALOADER: set[str] = set()
 
 
 def log_dataloader(logger: logging.Logger, loader, label: str) -> None:
     """Log dataloader/iterator details once per process."""
-    # Log only once in the process
+    # Log once per label (e.g., train/valid) in the process.
     global _LOGGED_DATALOADER
-    if _LOGGED_DATALOADER:
+    if label in _LOGGED_DATALOADER:
         return
-    _LOGGED_DATALOADER = True
+    _LOGGED_DATALOADER.add(label)
 
     logger.log(
         logging.INFO,
