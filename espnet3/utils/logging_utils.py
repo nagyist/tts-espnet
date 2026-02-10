@@ -22,7 +22,7 @@ LOG_FORMAT = (
     "[%(hostname)s] %(asctime)s (%(filename)s:%(lineno)d) "
     "%(levelname)s:\t[%(stage)s] %(message)s"
 )
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S %z"
 
 # =============================================================================
 # Logging Record Setup
@@ -50,6 +50,24 @@ def log_stage(name: str):
         yield
     finally:
         _LOG_STAGE.reset(token)
+
+
+def set_log_format(
+    log_format: str | None = None,
+    date_format: str | None = None,
+    apply: bool = True,
+) -> None:
+    """Override global log format/date format (optionally update live handlers)."""
+    global LOG_FORMAT, DATE_FORMAT
+    if log_format is not None:
+        LOG_FORMAT = log_format
+    if date_format is not None:
+        DATE_FORMAT = date_format
+    if apply:
+        formatter = logging.Formatter(fmt=LOG_FORMAT, datefmt=DATE_FORMAT)
+        root = logging.getLogger()
+        for handler in root.handlers:
+            handler.setFormatter(formatter)
 
 
 # =============================================================================
@@ -334,7 +352,7 @@ def log_run_metadata(
         )
         ```
 
-    Example log output (wrapped for readability, <= 88 chars):
+    Example log output (wrapped for readability):
         ```
         2026-02-04 10:15:22 | INFO | espnet3 | === ESPnet3 run started: \
             2026-02-04T10:15:22 ===
