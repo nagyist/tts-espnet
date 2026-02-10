@@ -5,6 +5,7 @@ from pathlib import Path
 
 import lightning
 import torch
+from humanfriendly import format_number, format_size
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
@@ -14,7 +15,6 @@ from espnet3.components.data.dataloader import DataLoaderBuilder
 from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
 from espnet3.components.optimizers.multiple_scheduler import MultipleScheduler
 from espnet3.utils.logging_utils import _log_component, log_stage
-from humanfriendly import format_number, format_size
 
 logger = logging.getLogger("lightning")
 

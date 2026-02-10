@@ -217,6 +217,7 @@ class CombinedDataset:
         )
 
     def __repr__(self) -> str:
+        """Return a concise, inspectable summary of combined datasets."""
         entries = []
         for idx, (dataset, (transform, preprocessor)) in enumerate(
             zip(self.datasets, self.transforms)
@@ -309,6 +310,7 @@ class DatasetWithTransform:
         return self.__getitem__(idx)
 
     def __repr__(self) -> str:
+        """Return a concise, inspectable summary of the wrapped dataset."""
         extra = _dataset_extra(self.dataset)
         extra = f", {extra}" if extra else ""
         return (

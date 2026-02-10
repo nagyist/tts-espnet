@@ -18,7 +18,6 @@ from typing import Mapping
 
 import torch
 
-
 LOG_FORMAT = (
     "[%(hostname)s] %(asctime)s (%(filename)s:%(lineno)d) "
     "%(levelname)s:\t[%(stage)s] %(message)s"

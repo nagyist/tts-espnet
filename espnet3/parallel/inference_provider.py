@@ -1,11 +1,10 @@
 """Inference-time provider helpers for dataset/model construction."""
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 from omegaconf import DictConfig
-
-import logging
 
 from espnet3.parallel.env_provider import EnvironmentProvider
 from espnet3.utils.logging_utils import log_instance_dict

@@ -6,7 +6,7 @@ import logging
 import os
 import time
 from pathlib import Path
-from typing import Any, Iterable, List, Sequence, Callable
+from typing import Any, Callable, Iterable, List, Sequence
 
 from espnet3.utils.logging_utils import log_stage, set_stage_log_handler
 

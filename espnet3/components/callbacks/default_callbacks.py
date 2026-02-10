@@ -19,6 +19,7 @@ from espnet3.utils.logging_utils import _log_component
 
 _LOGGED_CALLBACKS = False
 
+
 @typechecked
 class AverageCheckpointsCallback(Callback):
     """A custom callback for weight averaging over the top-K checkpoints.
