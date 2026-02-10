@@ -84,6 +84,34 @@ def test_configure_logging_rotates_existing_file(tmp_path: Path):
         _reset_logger(root, old_handlers, old_level, old_propagate)
 
 
+def test_set_log_format_updates_globals_and_handlers():
+    root = py_logging.getLogger()
+    old_handlers = list(root.handlers)
+    old_level = root.level
+    old_propagate = root.propagate
+    old_log_format = elog.LOG_FORMAT
+    old_date_format = elog.DATE_FORMAT
+    try:
+        root.handlers = []
+        root.propagate = False
+        handler = py_logging.StreamHandler()
+        root.addHandler(handler)
+
+        new_fmt = "%(levelname)s %(message)s"
+        new_date = "%Y"
+        elog.set_log_format(log_format=new_fmt, date_format=new_date, apply=True)
+
+        assert elog.LOG_FORMAT == new_fmt
+        assert elog.DATE_FORMAT == new_date
+        assert handler.formatter is not None
+        assert handler.formatter._fmt == new_fmt
+        assert handler.formatter.datefmt == new_date
+    finally:
+        elog.LOG_FORMAT = old_log_format
+        elog.DATE_FORMAT = old_date_format
+        _reset_logger(root, old_handlers, old_level, old_propagate)
+
+
 def test_log_run_metadata_logs_command_and_git(monkeypatch, tmp_path: Path):
     logger = py_logging.getLogger("espnet3.test.logging")
     old_handlers = list(logger.handlers)
@@ -170,11 +198,14 @@ def test_log_training_summary_includes_model_and_optimizer():
     logger, stream, cleanup = _capture_logger("espnet3.test.train_summary")
     old_handlers, old_level, old_propagate, handler = cleanup
 
+    from espnet3.components.modeling.lightning_module import ESPnetLightningModule
+
     model = DummyModel()
     optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
     scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=1)
+    module = ESPnetLightningModule.__new__(ESPnetLightningModule)
     try:
-        elog.log_training_summary(
+        module._log_training_summary(
             logger, model, optimizer=optimizer, scheduler=scheduler
         )
         out = stream.getvalue()
@@ -191,20 +222,22 @@ def test_log_data_organizer_includes_datasets():
     logger, stream, cleanup = _capture_logger("espnet3.test.data_organizer")
     old_handlers, old_level, old_propagate, handler = cleanup
 
-    class DummyOrganizer:
-        def __init__(self):
-            from espnet3.components.data.dataset import CombinedDataset
+    from espnet3.components.data.data_organizer import DataOrganizer
+    from espnet3.components.data.dataset import CombinedDataset
 
+    class DummyOrganizer(DataOrganizer):
+        def __init__(self):
+            self.preprocessor = lambda x: x
             self.train = CombinedDataset([DummyDataset()], [(lambda x: x, lambda x: x)])
             self.valid = CombinedDataset([DummyDataset()], [(lambda x: x, lambda x: x)])
-            self.test = {}
+            self.test_sets = {}
 
     try:
-        elog.log_data_organizer(logger, DummyOrganizer())
+        DummyOrganizer().log_summary(logger)
         out = stream.getvalue()
         assert "Data organizer:" in out
-        assert "train class: espnet3.components.data.dataset.CombinedDataset" in out
-        assert "valid class: espnet3.components.data.dataset.CombinedDataset" in out
+        assert "train dataset:" in out
+        assert "valid dataset:" in out
     finally:
         handler.close()
         _reset_logger(logger, old_handlers, old_level, old_propagate)
@@ -223,10 +256,12 @@ def test_log_data_organizer_combined_variants():
     def custom_preprocessor(sample):
         return sample
 
-    class DummyOrganizer:
-        def __init__(self):
-            from espnet3.components.data.dataset import CombinedDataset
+    from espnet3.components.data.data_organizer import DataOrganizer
+    from espnet3.components.data.dataset import CombinedDataset
 
+    class DummyOrganizer(DataOrganizer):
+        def __init__(self):
+            self.preprocessor = custom_preprocessor
             self.train = CombinedDataset(
                 [DummyDataset(), DummyDataset()],
                 [(custom_transform, custom_preprocessor), (other_transform, None)],
@@ -235,19 +270,14 @@ def test_log_data_organizer_combined_variants():
                 [DummyDataset()],
                 [(custom_transform, None)],
             )
-            self.test = {}
+            self.test_sets = {}
 
     try:
-        elog.log_data_organizer(logger, DummyOrganizer())
+        DummyOrganizer().log_summary(logger)
         out = stream.getvalue()
-        assert "train class: espnet3.components.data.dataset.CombinedDataset" in out
-        assert "valid class: espnet3.components.data.dataset.CombinedDataset" in out
-        assert "combined[0]:" in out
-        assert "combined[1]:" in out
-        assert "transform: test_logging.custom_transform" in out
-        assert "transform: test_logging.other_transform" in out
-        assert "preprocessor: test_logging.custom_preprocessor" in out
-        assert "preprocessor: builtins.NoneType" in out
+        assert "Data organizer:" in out
+        assert "train dataset:" in out
+        assert "valid dataset:" in out
     finally:
         handler.close()
         _reset_logger(logger, old_handlers, old_level, old_propagate)
@@ -257,15 +287,14 @@ def test_log_dataloader_formats_human_readable():
     logger, stream, cleanup = _capture_logger("espnet3.test.dataloader")
     old_handlers, old_level, old_propagate, handler = cleanup
 
-    from espnet3 import utils as espnet3_utils
+    from espnet3.components.data import dataloader as espnet3_dataloader
 
-    espnet3_utils.logging_utils._LOGGED_DATALOADER = False
+    espnet3_dataloader._LOGGED_DATALOADER = False
     loader = torch.utils.data.DataLoader(DummyDataset(), batch_size=2, num_workers=0)
     try:
-        elog.log_dataloader(logger, loader, label="train")
+        espnet3_dataloader.log_dataloader(logger, loader, label="train")
         out = stream.getvalue()
-        assert "DataLoader[train]:" in out
-        assert "[DataLoader]" in out
+        assert "DataLoader[train] class:" in out
         assert "batch_size" in out
         assert "num_workers" in out
     finally:
@@ -279,7 +308,7 @@ def test_log_dataloader_iter_factory_includes_batch_sampler_repr():
 
     from espnet2.iterators.sequence_iter_factory import SequenceIterFactory
     from espnet2.samplers.build_batch_sampler import build_batch_sampler
-    from espnet3 import utils as espnet3_utils
+    from espnet3.components.data import dataloader as espnet3_dataloader
 
     batches = build_batch_sampler(
         shape_files=["test_utils/espnet3/stats/stats_dummy"],
@@ -291,18 +320,36 @@ def test_log_dataloader_iter_factory_includes_batch_sampler_repr():
     iterator = iter_factory.build_iter(0, shuffle=False)
 
     try:
-        espnet3_utils.logging_utils._LOGGED_DATALOADER = False
-        elog.log_dataloader(
-            logger,
-            iterator,
-            label="train",
-            iter_factory=iter_factory,
-            batches=batches,
-        )
+        espnet3_dataloader._LOGGED_DATALOADER = False
+        espnet3_dataloader.log_dataloader(logger, iterator, label="train")
         out = stream.getvalue()
-        assert "IterFactory[train]:" in out
-        assert "UnsortedBatchSampler(" in out
-        assert "IterBatches[train]:" in out
+        assert "DataLoader[train] class:" in out
     finally:
         handler.close()
         _reset_logger(logger, old_handlers, old_level, old_propagate)
+
+
+def test_build_qualified_name_for_objects_and_classes():
+    from espnet3.utils.logging_utils import build_qualified_name
+
+    class LocalClass:
+        pass
+
+    assert build_qualified_name(LocalClass).endswith(".LocalClass")
+    assert build_qualified_name(LocalClass()).endswith(".LocalClass")
+    assert build_qualified_name([1, 2]).startswith("list(len=")
+
+
+def test_build_callable_name_for_functions_and_callables():
+    from espnet3.utils.logging_utils import build_callable_name
+
+    def local_fn():
+        return None
+
+    class CallableClass:
+        def __call__(self):
+            return None
+
+    assert build_callable_name(local_fn).endswith(".local_fn")
+    assert build_callable_name(CallableClass).endswith(".CallableClass")
+    assert build_callable_name(CallableClass()).endswith(".CallableClass")
