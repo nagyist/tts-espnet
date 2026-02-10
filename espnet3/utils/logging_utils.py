@@ -22,7 +22,7 @@ LOG_FORMAT = (
     "[%(hostname)s] %(asctime)s (%(filename)s:%(lineno)d) "
     "%(levelname)s:\t[%(stage)s] %(message)s"
 )
-DATE_FORMAT = "%Y-%m-%d %H:%M:%S %z"
+DATE_FORMAT = "%Y-%m-%d %H:%M:%S %Z"
 
 # =============================================================================
 # Logging Record Setup

@@ -20,7 +20,6 @@ _LOGGED_DATALOADER: set[str] = set()
 def log_dataloader(logger: logging.Logger, loader, label: str) -> None:
     """Log dataloader/iterator details once per process."""
     # Log once per label (e.g., train/valid) in the process.
-    global _LOGGED_DATALOADER
     if label in _LOGGED_DATALOADER:
         return
     _LOGGED_DATALOADER.add(label)
