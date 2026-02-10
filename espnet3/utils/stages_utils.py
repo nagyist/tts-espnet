@@ -3,12 +3,46 @@
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Any, Iterable, List, Sequence
 
 from espnet3.utils.logging_utils import log_stage
 
 logger = logging.getLogger(__name__)
+
+_RANK_ENV_KEYS = (
+    "RANK",
+    "LOCAL_RANK",
+    "SLURM_PROCID",
+    "OMPI_COMM_WORLD_RANK",
+    "PMI_RANK",
+    "MPI_RANK",
+)
+
+
+def _get_process_rank() -> int:
+    try:
+        import torch.distributed as dist
+
+        if dist.is_available() and dist.is_initialized():
+            return int(dist.get_rank())
+    except Exception:
+        pass
+
+    for key in _RANK_ENV_KEYS:
+        value = os.environ.get(key)
+        if value is not None and value.isdigit():
+            return int(value)
+    return 0
+
+
+def _get_stage_log_mode(system: Any) -> str:
+    mode = "rank0"
+    train_config = getattr(system, "train_config", None)
+    if train_config is not None:
+        mode = getattr(train_config, "stage_log_mode", mode)
+    return str(mode).lower()
 
 
 def resolve_stages(
