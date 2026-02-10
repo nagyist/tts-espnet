@@ -5,9 +5,10 @@ from __future__ import annotations
 import logging
 import os
 import time
-from typing import Any, Iterable, List, Sequence
+from pathlib import Path
+from typing import Any, Iterable, List, Sequence, Callable
 
-from espnet3.utils.logging_utils import log_stage
+from espnet3.utils.logging_utils import log_stage, set_stage_log_handler
 
 logger = logging.getLogger(__name__)
 
@@ -67,6 +68,7 @@ def run_stages(
     *,
     dry_run: bool = False,
     log: logging.Logger | None = None,
+    on_stage_start: Callable[[str, logging.Logger], None] | None = None,
 ) -> None:
     """Invoke stage methods on ``system`` in order with logging and timing.
 
@@ -75,6 +77,9 @@ def run_stages(
         stages_to_run: Iterable of stage method names to execute.
         dry_run: If True, log intended stages without executing them.
         log: Optional logger instance; defaults to module logger.
+        on_stage_start: Optional hook invoked after stage logging is configured.
+            This can be used to emit per-stage metadata (configs, environment,
+            requirements snapshots, etc.) into the newly attached log file.
 
     Raises:
         AttributeError: If a named stage method is missing on ``system``.
@@ -91,6 +96,41 @@ def run_stages(
             if dry_run:
                 log.info("[DRY RUN] would run stage: %s", stage)
                 continue
+                
+            stage_log_dirs = system.stage_log_dirs
+            log_dir = stage_log_dirs.get(stage) or stage_log_dirs.get("default")
+            filename = f"{stage}.log"
+
+            if stage == "train":
+                # stage_log_mode controls per-rank logging: "rank0" or "per_rank".
+                # rank0 avoids multi-process rotation races;
+                # per_rank writes per-rank logs.
+                stage_log_mode = _get_stage_log_mode(system)
+                rank = _get_process_rank()
+                if stage_log_mode not in {"rank0", "per_rank"}:
+                    log.error(
+                        "Unknown stage_log_mode=%r (expected 'rank0' or 'per_rank'); "
+                        "falling back to 'rank0'.",
+                        stage_log_mode,
+                    )
+                    stage_log_mode = "rank0"
+                if stage_log_mode == "rank0" and rank != 0:
+                    # Non-zero ranks skip file logging in rank0 mode.
+                    log_dir = None
+
+                filename = (
+                    f"{stage}.log"
+                    if stage_log_mode == "rank0"
+                    else f"{stage}_rank{rank}.log"
+                )
+
+            set_stage_log_handler(
+                log,
+                Path(log_dir) if log_dir else None,
+                filename=filename,
+            )
+            if on_stage_start is not None:
+                on_stage_start(stage, log)
 
             start = time.perf_counter()
             log.info("=== [START] stage: %s ===", stage)
