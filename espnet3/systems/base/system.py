@@ -82,7 +82,7 @@ class BaseSystem:
         self.train_config = train_config
         self.infer_config = infer_config
         self.measure_config = measure_config
-        
+
         if train_config is not None:
             self.exp_dir = Path(train_config.exp_dir)
             self.exp_dir.mkdir(parents=True, exist_ok=True)
@@ -139,10 +139,10 @@ class BaseSystem:
                 if resolved:
                     return resolved
             return None
-        
+
         if not isinstance(ref, str):
             return None
-        
+
         root_name, *parts = ref.split(".")
         current = getattr(target, root_name, None)
         for part in parts:

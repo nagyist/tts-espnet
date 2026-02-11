@@ -54,6 +54,7 @@ class ASRSystem(BaseSystem):
         measure_config=None,
         **kwargs,
     ) -> None:
+        """Initialize the ASR system with ASR-specific stage mappings."""
         super().__init__(
             train_config=train_config,
             infer_config=infer_config,

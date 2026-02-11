@@ -293,7 +293,8 @@ class DatasetWithTransform:
         extra = f", {extra}" if extra else ""
         return (
             f"{self.__class__.__name__}("
-            f"dataset={build_qualified_name(self.dataset)}(len={len(self.dataset)}{extra}), "
+            f"dataset={build_qualified_name(self.dataset)}"
+            f"(len={len(self.dataset)}{extra}), "
             f"transform={build_callable_name(self.transform)}, "
             f"preprocessor={build_callable_name(self.preprocessor)}, "
             f"use_espnet_preprocessor={self.use_espnet_preprocessor}"
