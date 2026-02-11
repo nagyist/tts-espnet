@@ -39,7 +39,30 @@ class ASRSystem(BaseSystem):
 
     This system adds:
       - Tokenizer training inside train()
+      - Dataset creation via ``create_dataset``
+
+    Additional stage log paths:
+        | Stage           | Path reference                  |
+        |---              |---                              |
+        | train_tokenizer | train_config.tokenizer.save_path |
     """
+
+    def __init__(
+        self,
+        train_config=None,
+        infer_config=None,
+        measure_config=None,
+        **kwargs,
+    ) -> None:
+        super().__init__(
+            train_config=train_config,
+            infer_config=infer_config,
+            measure_config=measure_config,
+            stage_log_mapping={
+                "train_tokenizer": "train_config.tokenizer.save_path",
+            },
+            **kwargs,
+        )
 
     def create_dataset(self, *args, **kwargs):
         """Create datasets using the configured helper function.
@@ -68,67 +91,6 @@ class ASRSystem(BaseSystem):
             config.func,
         )
         return result
-
-    def _get_stage_log_dirs(self) -> dict[str, Path]:
-        """Return stage-specific log directories when configured.
-
-        The ASR system routes logs to artifact directories when available:
-          - ``create_dataset``: ``train_config.create_dataset.dataset_dir`` or
-            ``train_config.dataset_dir`` or ``train_config.data_dir``.
-          - ``train_tokenizer``: ``train_config.tokenizer.save_path``.
-          - ``collect_stats``: ``train_config.stats_dir``.
-          - ``train``: ``train_config.exp_dir``.
-          - ``infer``: ``infer_config.inference_dir``.
-          - ``measure``: ``measure_config.inference_dir`` or 
-            ``infer_config.inference_dir``.
-
-        If none of the stage-specific paths are configured, it falls back to
-        ``BaseSystem._get_stage_log_dirs`` (``train_config.exp_dir`` or
-        ``<cwd>/logs``).
-
-        Args:
-            None
-
-        Returns:
-            dict[str, Path]: Mapping from stage name to log directory.
-        """
-        stage_log_dirs = dict(super()._get_stage_log_dirs())
-
-        cfg = getattr(self.train_config, "create_dataset", None)
-        if cfg is not None:
-            dataset_dir = getattr(cfg, "dataset_dir", None)
-            if dataset_dir:
-                stage_log_dirs["create_dataset"] = Path(dataset_dir)
-
-        dataset_dir = getattr(self.train_config, "dataset_dir", None)
-        if dataset_dir and "create_dataset" not in stage_log_dirs:
-            stage_log_dirs["create_dataset"] = Path(dataset_dir)
-
-        data_dir = getattr(self.train_config, "data_dir", None)
-        if data_dir and "create_dataset" not in stage_log_dirs:
-            stage_log_dirs["create_dataset"] = Path(data_dir)
-
-        tokenizer_cfg = getattr(self.train_config, "tokenizer", None)
-        save_path = getattr(tokenizer_cfg, "save_path", None) if tokenizer_cfg else None
-        if save_path:
-            stage_log_dirs["train_tokenizer"] = Path(save_path)
-
-        stats_dir = getattr(self.train_config, "stats_dir", None)
-        if stats_dir:
-            stage_log_dirs["collect_stats"] = Path(stats_dir)
-
-        exp_dir = getattr(self.train_config, "exp_dir", None)
-        if exp_dir:
-            exp_path = Path(exp_dir)
-            for stage in {"train", "pack_model", "upload_model"}:
-                stage_log_dirs[stage] = exp_path
-
-        inference_dir = getattr(self.infer_config, "inference_dir", None)
-        if inference_dir:
-            stage_log_dirs["infer"] = Path(inference_dir)
-            stage_log_dirs["measure"] = Path(inference_dir)
-
-        return stage_log_dirs
 
     def train(self, *args, **kwargs):
         """Train the model, training the tokenizer first if needed.
