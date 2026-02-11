@@ -289,7 +289,7 @@ def test_log_dataloader_formats_human_readable():
 
     from espnet3.components.data import dataloader as espnet3_dataloader
 
-    espnet3_dataloader._LOGGED_DATALOADER = False
+    espnet3_dataloader._LOGGED_DATALOADER = set()
     loader = torch.utils.data.DataLoader(DummyDataset(), batch_size=2, num_workers=0)
     try:
         espnet3_dataloader.log_dataloader(logger, loader, label="train")
@@ -320,7 +320,7 @@ def test_log_dataloader_iter_factory_includes_batch_sampler_repr():
     iterator = iter_factory.build_iter(0, shuffle=False)
 
     try:
-        espnet3_dataloader._LOGGED_DATALOADER = False
+        espnet3_dataloader._LOGGED_DATALOADER = set()
         espnet3_dataloader.log_dataloader(logger, iterator, label="train")
         out = stream.getvalue()
         assert "DataLoader[train] class:" in out
