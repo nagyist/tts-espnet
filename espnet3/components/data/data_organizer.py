@@ -62,6 +62,41 @@ def do_nothing(*x):
         return x
 
 
+def _log_dataset(
+    log: logging.Logger,
+    label: str,
+    combined: CombinedDataset | DatasetWithTransform | None,
+) -> None:
+    if combined is None:
+        log.info("%s dataset: None", label)
+        return
+
+    log.info("%s dataset: %s", label, build_qualified_name(combined))
+    if isinstance(combined, DatasetWithTransform):
+        log.info(
+            "%s dataset detail: %s(len=%s) transform=%s preprocessor=%s",
+            label,
+            build_qualified_name(combined.dataset),
+            len(combined),
+            build_callable_name(combined.transform),
+            build_callable_name(combined.preprocessor),
+        )
+        return
+
+    for idx, (dataset, (transform, preprocessor)) in enumerate(
+        zip(combined.datasets, combined.transforms)
+    ):
+        log.info(
+            "%s dataset[%d]: %s(len=%s) transform=%s preprocessor=%s",
+            label,
+            idx,
+            build_qualified_name(dataset),
+            len(dataset),
+            build_callable_name(transform),
+            build_callable_name(preprocessor),
+        )
+
+
 class DataOrganizer:
     """Organizes training, validation, and test datasets into a unified interface.
 
@@ -238,17 +273,13 @@ class DataOrganizer:
         """Log a concise dataset summary."""
         log = log or logger
         log.info("Data organizer: %s", build_qualified_name(self))
-        if self.train is None:
-            log.info("train dataset: None")
-        else:
-            log.info("train dataset: %s", build_qualified_name(self.train))
-        if self.valid is None:
-            log.info("valid dataset: None")
-        else:
-            log.info("valid dataset: %s", build_qualified_name(self.valid))
+        _log_dataset(log, "train", self.train)
+        _log_dataset(log, "valid", self.valid)
+
         if not self.test_sets:
             log.info("test datasets: None")
             return
+
         log.info("test datasets: %d", len(self.test_sets))
-        for name, ds in self.test_sets.items():
-            log.info("test[%s] dataset: %s", name, build_qualified_name(ds))
+        for name, dataset in self.test_sets.items():
+            _log_dataset(log, f"test[{name}]", dataset)

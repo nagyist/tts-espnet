@@ -6,29 +6,7 @@ from typing import Any, Callable, List, Tuple
 
 from torch.utils.data.dataset import Dataset
 
-
-def _truncate_text(text: str, max_len: int = 200) -> str:
-    if len(text) <= max_len:
-        return text
-    return text[: max_len - 3] + "..."
-
-
-def _qualified_name(obj: Any) -> str:
-    cls = obj.__class__
-    if cls.__module__ == "builtins":
-        if hasattr(obj, "__len__"):
-            try:
-                return f"{cls.__name__}(len={len(obj)})"
-            except Exception:
-                pass
-        return _truncate_text(str(obj))
-    return f"{cls.__module__}.{cls.__qualname__}"
-
-
-def _callable_name(func: Any) -> str:
-    if hasattr(func, "__qualname__") and hasattr(func, "__module__"):
-        return f"{func.__module__}.{func.__qualname__}"
-    return _qualified_name(func)
+from espnet3.utils.logging_utils import build_callable_name, build_qualified_name
 
 
 def _dataset_extra(obj: Any) -> str:
@@ -225,9 +203,9 @@ class CombinedDataset:
             extra = _dataset_extra(dataset)
             extra = f", {extra}" if extra else ""
             entries.append(
-                f"{idx}: {_qualified_name(dataset)}(len={len(dataset)}{extra}) "
-                f"transform={_callable_name(transform)} "
-                f"preprocessor={_callable_name(preprocessor)}"
+                f"{idx}: {build_qualified_name(dataset)}(len={len(dataset)}{extra}) "
+                f"transform={build_callable_name(transform)} "
+                f"preprocessor={build_callable_name(preprocessor)}"
             )
         datasets_desc = ", ".join(entries)
         return (
@@ -315,9 +293,9 @@ class DatasetWithTransform:
         extra = f", {extra}" if extra else ""
         return (
             f"{self.__class__.__name__}("
-            f"dataset={_qualified_name(self.dataset)}(len={len(self.dataset)}{extra}), "
-            f"transform={_callable_name(self.transform)}, "
-            f"preprocessor={_callable_name(self.preprocessor)}, "
+            f"dataset={build_qualified_name(self.dataset)}(len={len(self.dataset)}{extra}), "
+            f"transform={build_callable_name(self.transform)}, "
+            f"preprocessor={build_callable_name(self.preprocessor)}, "
             f"use_espnet_preprocessor={self.use_espnet_preprocessor}"
             f")"
         )
