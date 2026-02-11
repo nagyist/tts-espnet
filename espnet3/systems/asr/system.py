@@ -77,9 +77,10 @@ class ASRSystem(BaseSystem):
             ``train_config.dataset_dir`` or ``train_config.data_dir``.
           - ``train_tokenizer``: ``train_config.tokenizer.save_path``.
           - ``collect_stats``: ``train_config.stats_dir``.
-          - ``train``/``publish``: ``train_config.exp_dir``.
-          - ``infer``: ``infer_config.infer_dir``.
-          - ``metric``: ``metric_config.infer_dir`` or ``infer_config.infer_dir``.
+          - ``train``: ``train_config.exp_dir``.
+          - ``infer``: ``infer_config.inference_dir``.
+          - ``measure``: ``measure_config.inference_dir`` or 
+            ``infer_config.inference_dir``.
 
         If none of the stage-specific paths are configured, it falls back to
         ``BaseSystem._get_stage_log_dirs`` (``train_config.exp_dir`` or
@@ -125,7 +126,7 @@ class ASRSystem(BaseSystem):
         inference_dir = getattr(self.infer_config, "inference_dir", None)
         if inference_dir:
             stage_log_dirs["infer"] = Path(inference_dir)
-            stage_log_dirs["metric"] = Path(inference_dir)
+            stage_log_dirs["measure"] = Path(inference_dir)
 
         return stage_log_dirs
 

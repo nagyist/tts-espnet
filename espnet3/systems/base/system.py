@@ -6,7 +6,7 @@ from pathlib import Path
 from omegaconf import DictConfig
 
 from espnet3.systems.base.inference import infer
-from espnet3.systems.base.metric import metric
+from espnet3.systems.base.metric import measure
 from espnet3.systems.base.training import collect_stats, train
 
 logger = logging.getLogger(__name__)
@@ -19,7 +19,7 @@ class BaseSystem:
       - create_dataset()
       - train()
       - infer()
-      - metric()
+      - measure()
       - publish()
 
     This class intentionally does NOT implement:
@@ -34,12 +34,12 @@ class BaseSystem:
         self,
         train_config: DictConfig | None = None,
         infer_config: DictConfig | None = None,
-        metric_config: DictConfig | None = None,
+        measure_config: DictConfig | None = None,
     ) -> None:
         """Initialize the system with optional stage configs."""
         self.train_config = train_config
         self.infer_config = infer_config
-        self.metric_config = metric_config
+        self.measure_config = measure_config
         if train_config is not None:
             self.exp_dir = Path(train_config.exp_dir)
             self.exp_dir.mkdir(parents=True, exist_ok=True)
@@ -50,11 +50,11 @@ class BaseSystem:
             path.mkdir(parents=True, exist_ok=True)
         logger.info(
             "Initialized %s with train_config=%s infer_config=%s "
-            "metric_config=%s exp_dir=%s",
+            "measure_config=%s exp_dir=%s",
             self.__class__.__name__,
             train_config is not None,
             infer_config is not None,
-            metric_config is not None,
+            measure_config is not None,
             self.exp_dir,
         )
 
@@ -131,15 +131,15 @@ class BaseSystem:
         )
         return infer(self.infer_config)
 
-    def metric(self, *args, **kwargs):
+    def measure(self, *args, **kwargs):
         """Compute evaluation metrics from hypothesis/reference outputs."""
-        self._reject_stage_args("metric", args, kwargs)
+        self._reject_stage_args("measure", args, kwargs)
         logger.info(
-            "metric start | metric_config=%s",
-            self.metric_config is not None,
+            "Metrics start | measure_config=%s",
+            self.measure_config is not None,
         )
-        result = metric(self.metric_config)
-        logger.info("metric results: %s", result)
+        result = measure(self.measure_config)
+        logger.info("results: %s", result)
         return result
 
     def publish(self, *args, **kwargs):
