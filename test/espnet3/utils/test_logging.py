@@ -9,6 +9,22 @@ import torch.nn as nn
 
 from espnet3.utils import logging_utils as elog
 
+# | Test Name                                              | Description                                                    | # noqa: E501
+# |-------------------------------------------------------|----------------------------------------------------------------| # noqa: E501
+# | test_configure_logging_adds_console_and_file          | Adds both console and file handlers and writes log file        | # noqa: E501
+# | test_configure_logging_is_idempotent                  | Repeated configure keeps a single file handler                 | # noqa: E501
+# | test_configure_logging_rotates_existing_file          | Rotates pre-existing log file before new logging               | # noqa: E501
+# | test_set_log_format_updates_globals_and_handlers      | Updates global log/date formats and handler formatter          | # noqa: E501
+# | test_log_run_metadata_logs_command_and_git            | Logs argv, config paths, and git metadata                      | # noqa: E501
+# | test_log_run_metadata_writes_requirements             | Writes pip freeze output to requirements.txt                   | # noqa: E501
+# | test_log_training_summary_includes_model_and_optimizer| Logs model, optimizer, and scheduler summaries                 | # noqa: E501
+# | test_log_data_organizer_includes_datasets             | Logs train/valid dataset summaries from DataOrganizer          | # noqa: E501
+# | test_log_data_organizer_combined_variants             | Logs CombinedDataset variants with custom transforms           | # noqa: E501
+# | test_log_dataloader_formats_human_readable            | Formats DataLoader info with key attributes                    | # noqa: E501
+# | test_log_dataloader_iter_factory_includes_batch_sampler_repr | Logs iterator factory with batch sampler repr           | # noqa: E501
+# | test_build_qualified_name_for_objects_and_classes     | Builds qualified names for objects, classes, and collections   | # noqa: E501
+# | test_build_callable_name_for_functions_and_callables  | Builds callable names for functions and callable classes       | # noqa: E501
+
 
 def _reset_logger(logger: py_logging.Logger, handlers, level, propagate: bool) -> None:
     logger.handlers = handlers

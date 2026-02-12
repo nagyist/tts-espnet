@@ -67,6 +67,7 @@ def _log_dataset(
     label: str,
     combined: CombinedDataset | DatasetWithTransform | None,
 ) -> None:
+    """Log dataset structure and transforms for a given label."""
     if combined is None:
         log.info("%s dataset: None", label)
         return

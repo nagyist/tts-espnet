@@ -9,17 +9,6 @@ from torch.utils.data.dataset import Dataset
 from espnet3.utils.logging_utils import build_callable_name, build_qualified_name
 
 
-def _dataset_extra(obj: Any) -> str:
-    extras = []
-    split = getattr(obj, "split", None)
-    name = getattr(obj, "name", None)
-    if split is not None:
-        extras.append(f"split={split!r}")
-    if name is not None:
-        extras.append(f"name={name!r}")
-    return ", ".join(extras)
-
-
 class CombinedDataset:
     """Combines multiple datasets into a single unified dataset-like interface.
 
@@ -200,10 +189,8 @@ class CombinedDataset:
         for idx, (dataset, (transform, preprocessor)) in enumerate(
             zip(self.datasets, self.transforms)
         ):
-            extra = _dataset_extra(dataset)
-            extra = f", {extra}" if extra else ""
             entries.append(
-                f"{idx}: {build_qualified_name(dataset)}(len={len(dataset)}{extra}) "
+                f"{idx}: {build_qualified_name(dataset)}(len={len(dataset)}) "
                 f"transform={build_callable_name(transform)} "
                 f"preprocessor={build_callable_name(preprocessor)}"
             )
@@ -289,12 +276,10 @@ class DatasetWithTransform:
 
     def __repr__(self) -> str:
         """Return a concise, inspectable summary of the wrapped dataset."""
-        extra = _dataset_extra(self.dataset)
-        extra = f", {extra}" if extra else ""
         return (
             f"{self.__class__.__name__}("
             f"dataset={build_qualified_name(self.dataset)}"
-            f"(len={len(self.dataset)}{extra}), "
+            f"(len={len(self.dataset)}), "
             f"transform={build_callable_name(self.transform)}, "
             f"preprocessor={build_callable_name(self.preprocessor)}, "
             f"use_espnet_preprocessor={self.use_espnet_preprocessor}"

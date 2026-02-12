@@ -112,7 +112,7 @@ def configure_logging(
 
     Example log output:
         ```
-        2026-02-04 10:15:22 | INFO | espnet3 | hello
+        [babel-t9-28] 2026-02-11 03:57:16 EST (logging_utils.py:376) INFO: [main] hello
         ```
 
     Example directory tree (when `log_dir/filename` already exists):
@@ -354,16 +354,24 @@ def log_run_metadata(
 
     Example log output (wrapped for readability):
         ```
-        2026-02-04 10:15:22 | INFO | espnet3 | === ESPnet3 run started: \
-            2026-02-04T10:15:22 ===
-        2026-02-04 10:15:22 | INFO | espnet3 | Command: /usr/bin/python3 \
-            espnet3-train --config conf/train.yaml
-        2026-02-04 10:15:22 | INFO | espnet3 | Python: 3.10.12 (GCC 11.4.0)
-        2026-02-04 10:15:22 | INFO | espnet3 | Working directory: /home/user/espnet3
-        2026-02-04 10:15:22 | INFO | espnet3 | train config: /home/user/espnet3/conf/\
-            train.yaml
-        2026-02-04 10:15:22 | INFO | espnet3 | Git: commit=0123456789abcdef, \
-            short_commit=0123456, branch=main, worktree=clean
+        [hostname] 2026-02-11 03:57:16 EST (logging_utils.py:376) INFO: [train] \
+            === ESPnet3 run started: 2026-02-11T03:57:16.826337 ===
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
+            === ESPnet3 run started: 2026-02-11T03:57:16.826430 ===
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
+            Command: /path/to/espnet3/tools/.venv/bin/python run.py ... 
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
+            Python: 3.10.18 (main, Aug 18 2025, 19:18:25) [Clang 20.1.4 ]
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
+            Working directory: /path/to/espnet3/egs3/librispeech_100/asr
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO:	[train] \
+            train config: /path/to/espnet3/egs3/librispeech_100/asr/conf/train.yaml
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO:	[train] \
+            infer config: /path/to/espnet3/egs3/librispeech_100/asr/conf/inference.yaml
+        [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO:	[train] \
+            measure config: /path/to/espnet3/egs3/librispeech_100/asr/conf/measure.yaml
+        [hostname] 2026-02-11 03:57:17 EST (run.py:244) INFO:	[train] \
+            Git: commit=..., short_commit=..., branch=master, worktree=clean
         ```
 
     Args:
@@ -460,42 +468,42 @@ def log_env_metadata(
     Environment variables collected by default:
 
     Cluster prefixes:
-    | Prefix | Purpose |
-    |---|---|
-    | `SLURM_` | Slurm job/step metadata (job id, task id, node info) |
-    | `PBS_` | PBS/Torque job metadata |
-    | `LSF_` | LSF job metadata |
-    | `SGE_` | SGE job metadata |
-    | `COBALT_` | Cobalt job metadata |
-    | `OMPI_` | Open MPI runtime metadata |
-    | `PMI_` | PMI (Process Management Interface) metadata |
-    | `MPI_` | MPI runtime metadata (generic prefix) |
+    | Prefix    | Purpose                                              |
+    |-----------|------------------------------------------------------|
+    | `SLURM_`  | Slurm job/step metadata (job id, task id, node info) |
+    | `PBS_`    | PBS/Torque job metadata                              |
+    | `LSF_`    | LSF job metadata                                     |
+    | `SGE_`    | SGE job metadata                                     |
+    | `COBALT_` | Cobalt job metadata                                  |
+    | `OMPI_`   | Open MPI runtime metadata                            |
+    | `PMI_`    | PMI (Process Management Interface) metadata          |
+    | `MPI_`    | MPI runtime metadata (generic prefix)                |
 
     Runtime prefixes:
-    | Prefix | Purpose |
-    |---|---|
-    | `NCCL_` | NCCL configuration (multi-GPU comms) |
-    | `CUDA_` | CUDA runtime configuration |
-    | `ROCM_` | ROCm runtime configuration |
-    | `OMP_` | OpenMP threading configuration |
-    | `MKL_` | Intel MKL configuration |
-    | `OPENBLAS_` | OpenBLAS configuration |
-    | `UCX_` | UCX communication configuration |
-    | `NVIDIA_` | NVIDIA runtime configuration |
+    | Prefix      | Purpose                             |
+    |-------------|-------------------------------------|
+    | `NCCL_`     | NCCL configuration (multi-GPU comms)|
+    | `CUDA_`     | CUDA runtime configuration          |
+    | `ROCM_`     | ROCm runtime configuration          |
+    | `OMP_`      | OpenMP threading configuration      |
+    | `MKL_`      | Intel MKL configuration             |
+    | `OPENBLAS_` | OpenBLAS configuration              |
+    | `UCX_`      | UCX communication configuration     |
+    | `NVIDIA_`   | NVIDIA runtime configuration        |
 
     Explicit runtime keys:
-    | Key | Purpose |
-    |---|---|
-    | `PATH` | Executable search path |
-    | `PYTHONPATH` | Python module search path |
-    | `LD_LIBRARY_PATH` | Shared library search path |
-    | `CUDA_VISIBLE_DEVICES` | GPU visibility mask |
-    | `RANK` | Global rank (distributed) |
-    | `LOCAL_RANK` | Local rank on node |
-    | `NODE_RANK` | Node rank in job |
-    | `WORLD_SIZE` | Total process count |
-    | `MASTER_ADDR` | Distributed master address |
-    | `MASTER_PORT` | Distributed master port |
+    | Key                   | Purpose                          |
+    |-----------------------|----------------------------------|
+    | `PATH`                | Executable search path           |
+    | `PYTHONPATH`          | Python module search path        |
+    | `LD_LIBRARY_PATH`     | Shared library search path       |
+    | `CUDA_VISIBLE_DEVICES`| GPU visibility mask              |
+    | `RANK`                | Global rank (distributed)        |
+    | `LOCAL_RANK`          | Local rank on node               |
+    | `NODE_RANK`           | Node rank in job                 |
+    | `WORLD_SIZE`          | Total process count              |
+    | `MASTER_ADDR`         | Distributed master address       |
+    | `MASTER_PORT`         | Distributed master port          |
 
     Example usage:
         ```python
@@ -508,13 +516,12 @@ def log_env_metadata(
 
     Example log output:
         ```
-        2026-02-04 10:15:22 | INFO | espnet3 | Cluster env:
-        SLURM_JOB_ID=12345
-        SLURM_PROCID=0
-        2026-02-04 10:15:22 | INFO | espnet3 | Runtime env:
-        CUDA_VISIBLE_DEVICES=0
-        NCCL_DEBUG=INFO
-        PATH=/usr/local/bin:/usr/bin:/bin
+        [hostname] 2026-02-11 03:57:17 EST (run.py:256) INFO:	[train] Cluster env:
+            SLURM_JOB_ID=6335268
+        [hostname] 2026-02-11 03:57:17 EST (run.py:256) INFO:	[train] Runtime env:
+            CUDA_VISIBLE_DEVICES=0
+            NCCL_DEBUG=INFO
+            PATH=/usr/local/bin:/usr/bin:...
         ```
 
     Args:
@@ -658,6 +665,9 @@ def build_callable_name(func) -> str:
             def __call__(self, x): ...
         build_callable_name(MyClass())
         # => 'my_module.MyClass'
+
+        build_callable_name(len)
+        # => 'builtins.len'
         ```
     """
     if hasattr(func, "__qualname__") and hasattr(func, "__module__"):
@@ -688,6 +698,7 @@ def _dump_attrs(
     max_depth: int,
     seen: set[int],
 ) -> None:
+    """Log public attributes for an object with bounded recursion depth."""
     if depth > max_depth:
         logger.log(logging.INFO, "%s...", indent, stacklevel=3)
         return
@@ -795,25 +806,22 @@ def log_component(
     Example:
         ```python
         from espnet3.utils.logging_utils import log_component
-
-        # ESPnet3 dataset-like instance.
-        dataset = SomeDatasetClass(split="train")
-        log_component(logger, "Dataset", "train", dataset, max_depth=2)
-
-        # Torch optimizer instance.
-        optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
-        log_component(logger, "Optimizer", "adam", optimizer, max_depth=1)
-
+        
         # Custom class instance.
         class CustomThing:
             def __init__(self, name: str, value: int):
                 self.name = name
                 self.value = value
 
-            def __repr__(self) -> str:
-                return f"CustomThing(name={self.name!r}, value={self.value})"
+        log_component(logger, "Custom", "example", CustomThing("demo", 7))
+        ```
 
-        log_component(logger, "Custom", "example", CustomThing("demo", 7), max_depth=1)
+        Example log output:
+        ```
+        Custom[example] class: my_module.CustomThing
+        Custom[example]: <my_module.CustomThing object at ...>
+          name: 'demo'
+          value: 7
         ```
 
     Notes:

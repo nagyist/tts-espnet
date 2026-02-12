@@ -6,6 +6,14 @@ import torch.nn as nn
 
 from espnet3.components.callbacks.default_callbacks import TrainBatchMetricsLogger
 
+# | Test Name                         | Description                                                    | # noqa: E501
+# |----------------------------------|----------------------------------------------------------------| # noqa: E501
+# | test_load_line_basic             | Reads a file with multiple lines like "a\\nb\\nc"               | # noqa: E501
+# | test_load_line_with_whitespace   | Strips leading/trailing whitespace from each line              | # noqa: E501
+# | test_load_line_empty_file        | Returns an empty list for an empty file                        | # noqa: E501
+# | test_load_line_single_line       | Handles file with only one line, no newline                    | # noqa: E501
+# | test_load_line_trailing_newline  | Handles file ending with a newline character                   | # noqa: E501
+
 
 class DummyTrainer:
     def __init__(self, optimizer):

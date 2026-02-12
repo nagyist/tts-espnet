@@ -30,12 +30,9 @@ class BaseSystem:
     All behavior is config-driven.
 
     Args:
-        train_config (DictConfig | None): Training configuration. Used for
-            ``exp_dir`` and other training-related stage log paths.
-        infer_config (DictConfig | None): Inference configuration. Used for
-            inference-related stage log paths.
-        measure_config (DictConfig | None): Measurement configuration. Used for
-            measurement-related stage log paths.
+        train_config (DictConfig | None): Training configuration.
+        infer_config (DictConfig | None): Inference configuration.
+        measure_config (DictConfig | None): Measurement configuration.
         stage_log_mapping (dict | None): Optional overrides for stage log path
             resolution. Keys are stage names; values are dotted attribute
             paths (e.g., ``"train_config.exp_dir"``) or lists/tuples of such
