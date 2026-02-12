@@ -359,7 +359,7 @@ def log_run_metadata(
         [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
             === ESPnet3 run started: 2026-02-11T03:57:16.826430 ===
         [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
-            Command: /path/to/espnet3/tools/.venv/bin/python run.py ... 
+            Command: /path/to/espnet3/tools/.venv/bin/python run.py ...
         [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
             Python: 3.10.18 (main, Aug 18 2025, 19:18:25) [Clang 20.1.4 ]
         [hostname] 2026-02-11 03:57:16 EST (run.py:244) INFO: [train] \
@@ -806,7 +806,7 @@ def log_component(
     Example:
         ```python
         from espnet3.utils.logging_utils import log_component
-        
+
         # Custom class instance.
         class CustomThing:
             def __init__(self, name: str, value: int):
