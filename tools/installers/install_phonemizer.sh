@@ -41,8 +41,10 @@ if [ ! -e espeak-ng.done ]; then
     git clone https://github.com/espeak-ng/espeak-ng.git
     (
         set -euo pipefail
-        cd espeak-ng && ./autogen.sh && ./configure --prefix=$PWD && make && make install
-
+        cd espeak-ng
+        cmake -B build -DCMAKE_INSTALL_PREFIX=$PWD
+        cmake --build build
+        cmake --install build
     )
     touch espeak-ng.done
 else
