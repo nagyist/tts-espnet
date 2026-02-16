@@ -114,6 +114,9 @@ Run training:
 
 ### Results (TF-GridNet)
 
+- config: ./conf/tuning/train_enh_tfgrid.yaml
+- model: https://huggingface.co/espnet/ms_snsd_tfgridnet
+
 | dataset             | STOI  | SAR   | SDR   | SIR | SI_SNR |
 |---------------------|-------|-------|-------|-----|--------|
 | enhanced_cv_ms_snsd | 88.49 | 20.16 | 20.16 | 0.00 | 19.90  |
