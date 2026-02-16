@@ -11,7 +11,7 @@ sample_rate=16k
 
 train_set=tr_ms_snsd
 valid_set=cv_ms_snsd
-test_sets="tt_ms_snsd" 
+test_sets="tt_ms_snsd"
 
 ./enh.sh \
     --lang en \
