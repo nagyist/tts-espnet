@@ -43,7 +43,10 @@ if [ ! -e espeak-ng.done ]; then
         set -euo pipefail
         cd espeak-ng
         git checkout $(git tag --sort=-creatordate | head -n 1)
-        cmake -B build -DCMAKE_INSTALL_PREFIX="$PWD"
+        cmake -B build \
+            -DCMAKE_INSTALL_PREFIX="$PWD" \
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_POSITION_INDEPENDENT_CODE=ON
         cmake --build build
         cmake --install build
     )
