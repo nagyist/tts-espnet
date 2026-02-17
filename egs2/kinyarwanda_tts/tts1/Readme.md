@@ -13,7 +13,7 @@ See the following pages before asking the question:
 
 # INITIAL RESULTS
 
-**Model:** Tacotron 2 (Transfer Learning from LJSpeech)  
+**Model:** Tacotron 2 (Transfer Learning from LJSpeech)
 **Vocoder:** Parallel WaveGAN (LJSpeech pre-trained)
 
 ## Environments
