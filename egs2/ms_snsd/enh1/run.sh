@@ -22,7 +22,7 @@ test_sets="tt_ms_snsd"
     --ngpu 2 \
     --ref_num 1 \
     --local_data_opts "" \
-    --enh_config ./conf/tuning/train_enh_tfgridnet.yaml \
+    --enh_config ./conf/train.yaml \
     --use_dereverb_ref false \
     --use_noise_ref true \
     --max_wav_duration 31 \
