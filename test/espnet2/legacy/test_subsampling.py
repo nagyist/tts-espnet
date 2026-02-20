@@ -13,7 +13,6 @@ from espnet2.legacy.nets.pytorch_backend.transformer.subsampling import (
     check_short_utt,
 )
 
-
 SUBSAMPLING_CLASSES = (
     Conv1dSubsampling1,
     Conv1dSubsampling2,
