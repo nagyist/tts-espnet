@@ -39,7 +39,7 @@ For more details: https://espnet.github.io/espnet/installation.html#step-2-insta
 ## Check installation
 
 ```sh
-bash -c ". ./activate_python.sh;. ./extra_path.sh; python3 check_install.py"
+bash -c ". ./activate_python.sh; . ./extra_path.sh; python3 check_install.py"
 ```
 
 
