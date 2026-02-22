@@ -11,8 +11,19 @@ on:
       - espnet3
 
 jobs:
+  setup_macos:
+    runs-on: macOS-latest
+    if: github.event.pull_request.draft == false
+    steps:
+      - uses: actions/checkout@master
+      - name: Install FFmpeg via Homebrew
+        run: brew install ffmpeg
+      - name: Run ffmpeg command
+        run: ffmpeg -version
+
   check_installable_on_macos:
     runs-on: macOS-latest
+    needs: setup_macos
     if: github.event.pull_request.draft == false
     strategy:
       matrix:
@@ -25,10 +36,6 @@ jobs:
         with:
           path: ~/.cache/pip
           key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
-      - name: Install FFmpeg via Homebrew
-        run: brew install ffmpeg
-      - name: Run ffmpeg command
-        run: ffmpeg -version
       - uses: actions/setup-python@v6
         with:
           python-version: ${{ matrix.python-version }}
