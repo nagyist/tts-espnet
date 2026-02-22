@@ -16,9 +16,9 @@ fi
 PRIMARY_URL="https://www-i6.informatik.rwth-aachen.de/web/Software/mwerSegmenter.tar.gz"
 BACKUP_URL="https://huggingface.co/espnet/ci_tools/resolve/main/mwerSegmenter.tar.gz"
 
-if ! wget --no-check-certificate --tries=3 "${PRIMARY_URL}"; then
+if ! wget --no-check-certificate --tries=3 -O mwerSegmenter.tar.gz "${PRIMARY_URL}"; then
     echo "Primary download failed, trying backup URL..."
-    if ! wget --no-check-certificate --tries=3 "${BACKUP_URL}"; then
+    if ! wget --no-check-certificate --tries=3 -O mwerSegmenter.tar.gz "${BACKUP_URL}"; then
         echo "Both primary and backup downloads failed"
         exit 1
     fi
