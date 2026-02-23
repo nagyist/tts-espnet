@@ -82,9 +82,7 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
-        run: |
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
+        uses: ./.github/actions/install-system-dependencies
       - name: test python
         run: ./ci/test_python_espnet2.sh
       - uses: codecov/codecov-action@v5
@@ -116,9 +114,7 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
-        run: |
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
+        uses: ./.github/actions/install-system-dependencies
       - name: test utils
         run: ./ci/test_utils.sh
       - uses: codecov/codecov-action@v5
@@ -150,9 +146,7 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
-        run: |
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
+        uses: ./.github/actions/install-system-dependencies
       - name: test shell
         run: |
           ./ci/test_shell_espnet2.sh
@@ -181,9 +175,7 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
-        run: |
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+        uses: ./.github/actions/install-system-dependencies
       - name: test espnet2 integration
         run: ./ci/test_integration_espnet2.sh
       - uses: codecov/codecov-action@v5
@@ -210,9 +202,7 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
-        run: |
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+        uses: ./.github/actions/install-system-dependencies
       - name: test configuration
         run: ./ci/test_configuration_espnet2.sh
       - uses: codecov/codecov-action@v5
@@ -240,9 +230,7 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
-        run: |
-            sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
+        uses: ./.github/actions/install-system-dependencies
       - name: test python
         run: ./ci/test_python_espnet3.sh
       - uses: codecov/codecov-action@v5
