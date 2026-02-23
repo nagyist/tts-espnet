@@ -10,7 +10,7 @@ exclude="egs2/TEMPLATE/asr1/utils,egs2/TEMPLATE/asr1/steps,egs2/TEMPLATE/tts1/si
 # flake8
 echo "::group::=== Run test flake8 ==="
 "$(dirname $0)"/test_flake8.sh espnet3
-echo "::endgroup::" 
+echo "::endgroup::"
 
 # pycodestyle
 echo "::group::=== Run pycodestyle tests ==="
