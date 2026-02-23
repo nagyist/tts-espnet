@@ -14,6 +14,26 @@ gen_dummy_coverage(){
     touch empty.py; ${python} empty.py
 }
 
+run_timed() {
+    local label="$1"
+    shift
+
+    local start_ts end_ts elapsed rc
+    start_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "==== [TIMING][START] ${label} @ ${start_ts} ===="
+
+    local t0=${SECONDS}
+    set +e
+    "$@"
+    rc=$?
+    set -e
+
+    elapsed=$((SECONDS - t0))
+    end_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "==== [TIMING][END] ${label} @ ${end_ts} elapsed=${elapsed}s rc=${rc} ===="
+    return ${rc}
+}
+
 #### Make sure chainer-independent ####
 python3 -m pip uninstall -y chainer
 
@@ -265,7 +285,8 @@ if python -c 'import torch as t; from packaging.version import parse as L; asser
     cd ./egs2/mini_an4/enh_asr1
     gen_dummy_coverage
     echo "==== [ESPnet2] ENH_ASR ==="
-    ./run.sh --ngpu 0 --stage 0 --stop-stage 15 --skip-packing false --skip-upload_hf false --feats-type "raw" --spk-num 1 --enh_asr_args "--enh_separator_conf num_spk=1 --num_workers 0" --python "${python}"
+    run_timed "ENH_ASR: raw spk1 stage0-15" \
+        ./run.sh --ngpu 0 --stage 0 --stop-stage 15 --skip-packing false --skip-upload_hf false --feats-type "raw" --spk-num 1 --enh_asr_args "--enh_separator_conf num_spk=1 --num_workers 0" --python "${python}"
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
