@@ -28,7 +28,7 @@ jobs:
             echo "is_docker=false" >> "$GITHUB_OUTPUT"
           fi
 
-  test_espnet2:
+  setup_espnet2:
     runs-on: ubuntu-latest
     needs: process_labels
     if: |
@@ -40,51 +40,24 @@ jobs:
         pytorch-version: [2.5.1, 2.7.1, 2.8.0, 2.9.1]
         chainer-version: [6.0.0]
         use-conda: [false]
-        # By default, all combinations run python tests only
-        run-shell: [false]
-        run-python: [true]
-        run-utils: [false]
-        run-integration: [false]
         exclude:
           # Exclude 3.12 with older/newer PyTorch versions for integration tests
           - python-version: "3.12"
             pytorch-version: 2.8.0
           - python-version: "3.12"
             pytorch-version: 2.9.1
-        include:
-          # Core combination - runs all tests
-          - python-version: "3.10"
-            pytorch-version: 2.7.1
-            chainer-version: 6.0.0
-            use-conda: false
-            run-shell: true
-            run-python: true
-            run-utils: true
-            run-integration: true
-          # Add integration tests for 3.12 with selected PyTorch versions
-          - python-version: "3.12"
-            pytorch-version: 2.5.1
-            chainer-version: 6.0.0
-            use-conda: false
-            run-shell: false
-            run-python: true
-            run-utils: false
-            run-integration: true
-          - python-version: "3.12"
-            pytorch-version: 2.7.1
-            chainer-version: 6.0.0
-            use-conda: false
-            run-shell: false
-            run-python: true
-            run-utils: false
-            run-integration: true
     steps:
       - uses: actions/checkout@master
       - uses: actions/cache@v5
+        id: cache-venv
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          path: |
+            ~/.cache/pip
+            tools/venv
+            tools/kaldi
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Make environment
+        if: steps.cache-venv.outputs.cache-hit != 'true'
         uses: ./.github/actions/prepare-environment
         with:
           os-version: ubuntu
@@ -92,50 +65,161 @@ jobs:
           pytorch-version: ${{ matrix.pytorch-version }}
           chainer-version: ${{ matrix.chainer-version }}
           use-conda: ${{ matrix.use-conda }}
-      
-      - name: test shell
-        if: matrix.run-shell == true
-        run: |
-          ./ci/test_shell_espnet2.sh
+      - name: Install Kaldi
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        run: ./ci/install_kaldi.sh
 
+  test_python_espnet2:
+    runs-on: ubuntu-latest
+    needs: setup_espnet2
+    if: |
+      github.event.pull_request.draft == false
+    strategy:
+      max-parallel: 20
+      matrix:
+        python-version: ["3.10", "3.12"]
+        pytorch-version: [2.5.1, 2.7.1, 2.8.0, 2.9.1]
+        use-conda: [false]
+        exclude:
+          - python-version: "3.12"
+            pytorch-version: 2.8.0
+          - python-version: "3.12"
+            pytorch-version: 2.9.1
+        include:
+          - python-version: "3.12"
+            pytorch-version: 2.5.1
+            use-conda: false
+          - python-version: "3.12"
+            pytorch-version: 2.7.1
+            use-conda: false
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            tools/venv
+            tools/kaldi
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+      - name: Install System Dependencies
+        run: |
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
       - name: test python
-        if: matrix.run-python == true
-        run: ./ci/test_python_espnet2.sh
+        run: source tools/activate_python.sh && ./ci/test_python_espnet2.sh
       - uses: codecov/codecov-action@v5
-        if: matrix.run-python == true
         with:
           flags: test_python_espnet2
       - name: coverage erase
-        if: matrix.run-python == true
         continue-on-error: true
         run: |
           source tools/activate_python.sh
           coverage erase
 
-      - name: install kaldi
-        if: matrix.run-utils == true || matrix.run-integration == true
+  test_utils_espnet2:
+    runs-on: ubuntu-latest
+    needs: setup_espnet2
+    if: |
+      github.event.pull_request.draft == false
+    strategy:
+      max-parallel: 20
+      matrix:
+        python-version: ["3.10", "3.12"]
+        pytorch-version: [2.7.1] # Only run utils for the main config? The original only ran utils for 3.10/2.7.1
+        use-conda: [false]
+        include:
+          - python-version: "3.10"
+            pytorch-version: 2.7.1
+            use-conda: false
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            tools/venv
+            tools/kaldi
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+      - name: Install System Dependencies
         run: |
-          ./ci/install_kaldi.sh
-
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
       - name: test utils
-        if: matrix.run-utils == true
-        run: ./ci/test_utils.sh
+        run: source tools/activate_python.sh && ./ci/test_utils.sh
       - uses: codecov/codecov-action@v5
-        if: matrix.run-utils == true
         with:
           flags: test_utils
       - name: coverage erase
-        if: matrix.run-utils == true
         continue-on-error: true
         run: |
           source tools/activate_python.sh
           coverage erase
 
+  test_shell_espnet2:
+    runs-on: ubuntu-latest
+    needs: setup_espnet2
+    if: |
+      github.event.pull_request.draft == false
+    strategy:
+      max-parallel: 20
+      matrix:
+        python-version: ["3.10"]
+        pytorch-version: [2.7.1]
+        use-conda: [false]
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            tools/venv
+            tools/kaldi
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+      - name: Install System Dependencies
+        run: |
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+      - name: test shell
+        run: |
+          ./ci/test_shell_espnet2.sh
+
+  test_integration_espnet2:
+    runs-on: ubuntu-latest
+    needs: setup_espnet2
+    if: |
+      github.event.pull_request.draft == false
+    strategy:
+      max-parallel: 20
+      matrix:
+        python-version: ["3.10", "3.12"]
+        pytorch-version: [2.5.1, 2.7.1]
+        use-conda: [false]
+        include:
+            - python-version: "3.10"
+              pytorch-version: 2.7.1
+              use-conda: false
+            - python-version: "3.12"
+              pytorch-version: 2.5.1
+              use-conda: false
+            - python-version: "3.12"
+              pytorch-version: 2.7.1
+              use-conda: false
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            tools/venv
+            tools/kaldi
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+      - name: Install System Dependencies
+        run: |
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
       - name: test espnet2 integration
-        if: matrix.run-integration == true
-        run: ./ci/test_integration_espnet2.sh
+        run: source tools/activate_python.sh && ./ci/test_integration_espnet2.sh
       - uses: codecov/codecov-action@v5
-        if: matrix.run-integration == true
         with:
           flags: test_integration_espnet2
 
