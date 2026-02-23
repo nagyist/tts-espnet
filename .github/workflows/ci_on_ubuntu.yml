@@ -28,7 +28,7 @@ jobs:
             echo "is_docker=false" >> "$GITHUB_OUTPUT"
           fi
 
-  setup_espnet2:
+  setup_environment:
     runs-on: ubuntu-latest
     needs: process_labels
     if: |
@@ -40,12 +40,6 @@ jobs:
         pytorch-version: [2.5.1, 2.7.1, 2.8.0, 2.9.1]
         chainer-version: [6.0.0]
         use-conda: [false]
-        exclude:
-          # Exclude 3.12 with older/newer PyTorch versions for integration tests
-          - python-version: "3.12"
-            pytorch-version: 2.8.0
-          - python-version: "3.12"
-            pytorch-version: 2.9.1
     steps:
       - uses: actions/checkout@master
       - uses: actions/cache@v5
@@ -53,8 +47,7 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            tools/venv
-            tools/kaldi
+            tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Make environment
         if: steps.cache-venv.outputs.cache-hit != 'true'
@@ -71,7 +64,7 @@ jobs:
 
   test_python_espnet2:
     runs-on: ubuntu-latest
-    needs: setup_espnet2
+    needs: setup_environment
     if: |
       github.event.pull_request.draft == false
     strategy:
@@ -80,33 +73,20 @@ jobs:
         python-version: ["3.10", "3.12"]
         pytorch-version: [2.5.1, 2.7.1, 2.8.0, 2.9.1]
         use-conda: [false]
-        exclude:
-          - python-version: "3.12"
-            pytorch-version: 2.8.0
-          - python-version: "3.12"
-            pytorch-version: 2.9.1
-        include:
-          - python-version: "3.12"
-            pytorch-version: 2.5.1
-            use-conda: false
-          - python-version: "3.12"
-            pytorch-version: 2.7.1
-            use-conda: false
     steps:
       - uses: actions/checkout@master
       - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
-            tools/venv
-            tools/kaldi
+            tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         run: |
             sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
       - name: test python
-        run: source tools/activate_python.sh && ./ci/test_python_espnet2.sh
+        run: ./ci/test_python_espnet2.sh
       - uses: codecov/codecov-action@v5
         with:
           flags: test_python_espnet2
@@ -118,34 +98,29 @@ jobs:
 
   test_utils_espnet2:
     runs-on: ubuntu-latest
-    needs: setup_espnet2
+    needs: setup_environment
     if: |
       github.event.pull_request.draft == false
     strategy:
       max-parallel: 20
       matrix:
         python-version: ["3.10", "3.12"]
-        pytorch-version: [2.7.1] # Only run utils for the main config? The original only ran utils for 3.10/2.7.1
+        pytorch-version: [2.7.1]
         use-conda: [false]
-        include:
-          - python-version: "3.10"
-            pytorch-version: 2.7.1
-            use-conda: false
     steps:
       - uses: actions/checkout@master
       - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
-            tools/venv
-            tools/kaldi
+            tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         run: |
             sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
       - name: test utils
-        run: source tools/activate_python.sh && ./ci/test_utils.sh
+        run: ./ci/test_utils.sh
       - uses: codecov/codecov-action@v5
         with:
           flags: test_utils
@@ -157,7 +132,7 @@ jobs:
 
   test_shell_espnet2:
     runs-on: ubuntu-latest
-    needs: setup_espnet2
+    needs: setup_environment
     if: |
       github.event.pull_request.draft == false
     strategy:
@@ -172,37 +147,30 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            tools/venv
-            tools/kaldi
+            tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         run: |
             sudo apt-get update -qq
-            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
       - name: test shell
         run: |
           ./ci/test_shell_espnet2.sh
 
   test_integration_espnet2:
     runs-on: ubuntu-latest
-    needs: setup_espnet2
+    needs: setup_environment
     if: |
       github.event.pull_request.draft == false
     strategy:
       max-parallel: 20
       matrix:
         python-version: ["3.10", "3.12"]
-        pytorch-version: [2.5.1, 2.7.1]
+        pytorch-version: [2.5.1, 2.9.1]
         use-conda: [false]
-        include:
-            - python-version: "3.10"
-              pytorch-version: 2.7.1
-              use-conda: false
+        exclude:
             - python-version: "3.12"
               pytorch-version: 2.5.1
-              use-conda: false
-            - python-version: "3.12"
-              pytorch-version: 2.7.1
               use-conda: false
     steps:
       - uses: actions/checkout@master
@@ -210,22 +178,50 @@ jobs:
         with:
           path: |
             ~/.cache/pip
-            tools/venv
-            tools/kaldi
+            tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         run: |
             sudo apt-get update -qq
             sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
       - name: test espnet2 integration
-        run: source tools/activate_python.sh && ./ci/test_integration_espnet2.sh
+        run: ./ci/test_integration_espnet2.sh
       - uses: codecov/codecov-action@v5
         with:
           flags: test_integration_espnet2
 
+  test_configuration_espnet2:
+    runs-on: ubuntu-latest
+    needs: setup_environment
+    if: |
+      github.event.pull_request.draft == false
+    strategy:
+      max-parallel: 20
+      matrix:
+        python-version: ["3.10"]
+        pytorch-version: ["2.7.1"]
+        use-conda: [false]
+    steps:
+      - uses: actions/checkout@master
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cache/pip
+            tools
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+      - name: Install System Dependencies
+        run: |
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg
+      - name: test configuration
+        run: ./ci/test_configuration_espnet2.sh
+      - uses: codecov/codecov-action@v5
+        with:
+          flags: test_configuration_espnet2
+
   test_python_espnet3:
     runs-on: ubuntu-latest
-    needs: process_labels
+    needs: setup_environment
     if: |
       github.event.pull_request.draft == false
     strategy:
@@ -235,26 +231,18 @@ jobs:
         pytorch-version: [2.5.1, 2.7.1, 2.8.0, 2.9.1]
         chainer-version: [6.0.0]
         use-conda: [false]
-        exclude:
-          # Exclude 3.12 with older/newer PyTorch versions
-          - python-version: "3.12"
-            pytorch-version: 2.8.0
-          - python-version: "3.12"
-            pytorch-version: 2.9.1
     steps:
       - uses: actions/checkout@master
       - uses: actions/cache@v5
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
-      - name: Make environment
-        uses: ./.github/actions/prepare-environment
-        with:
-          os-version: ubuntu
-          python-version: ${{ matrix.python-version }}
-          pytorch-version: ${{ matrix.pytorch-version }}
-          chainer-version: ${{ matrix.chainer-version }}
-          use-conda: ${{ matrix.use-conda }}
+          path: |
+            ~/.cache/pip
+            tools
+          key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+      - name: Install System Dependencies
+        run: |
+            sudo apt-get update -qq
+            sudo apt-get install -qq -y cmake libsndfile1-dev bc sox ffmpeg libjpeg-dev
       - name: test python
         run: ./ci/test_python_espnet3.sh
       - uses: codecov/codecov-action@v5
@@ -265,44 +253,6 @@ jobs:
         run: |
           source tools/activate_python.sh
           coverage erase
-
-  test_configuration_espnet2:
-    runs-on: ubuntu-latest
-    needs: process_labels
-    if: |
-      github.event.pull_request.draft == false
-    strategy:
-      max-parallel: 20
-      matrix:
-        python-version: ["3.10"]
-        pytorch-version: ["2.6.0"]
-        chainer-version: ["6.0.0"]
-        use-conda: [false]
-    steps:
-      - uses: actions/checkout@master
-      - uses: actions/cache@v5
-        with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
-      - name: Make environment
-        uses: ./.github/actions/prepare-environment
-        with:
-          os-version: ubuntu
-          python-version: ${{ matrix.python-version }}
-          pytorch-version: ${{ matrix.pytorch-version }}
-          chainer-version: ${{ matrix.chainer-version }}
-          use-conda: ${{ matrix.use-conda }}
-      - name: Clean environment
-        run: |
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf "/usr/local/share/boost"
-          sudo rm -rf /root/.cache/*
-      - name: test configuration
-        run: ./ci/test_configuration_espnet2.sh
-      - uses: codecov/codecov-action@v5
-        with:
-          flags: test_configuration_espnet2
 
   test_import:
     runs-on: ubuntu-latest
