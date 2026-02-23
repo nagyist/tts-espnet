@@ -61,6 +61,9 @@ jobs:
       - name: Install Kaldi
         if: steps.cache-venv.outputs.cache-hit != 'true'
         run: ./ci/install_kaldi.sh
+      - name: Warm up system dependencies cache
+        if: steps.cache-venv.outputs.cache-hit != 'true'
+        uses: ./.github/actions/install-system-dependencies
 
   test_python_espnet2:
     runs-on: ubuntu-latest
