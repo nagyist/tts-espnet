@@ -50,7 +50,6 @@ jobs:
             tools
           key: ${{ runner.os }}-venv-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Make environment
-        if: steps.cache-venv.outputs.cache-hit != 'true'
         uses: ./.github/actions/prepare-environment
         with:
           os-version: ubuntu
@@ -59,7 +58,6 @@ jobs:
           chainer-version: ${{ matrix.chainer-version }}
           use-conda: ${{ matrix.use-conda }}
       - name: Install Kaldi
-        if: steps.cache-venv.outputs.cache-hit != 'true'
         run: ./ci/install_kaldi.sh
 
   test_python_espnet2:
