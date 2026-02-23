@@ -28,19 +28,9 @@ jobs:
             echo "is_docker=false" >> "$GITHUB_OUTPUT"
           fi
 
-  warm_system_cache:
-    runs-on: ubuntu-latest
-    needs: process_labels
-    if: |
-      github.event.pull_request.draft == false
-    steps:
-      - uses: actions/checkout@master
-      - name: Warm up system dependencies cache
-        uses: ./.github/actions/install-system-dependencies
-
   setup_environment:
     runs-on: ubuntu-latest
-    needs: [process_labels, warm_system_cache]
+    needs: process_labels
     if: |
       github.event.pull_request.draft == false
     strategy:
