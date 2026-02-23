@@ -18,7 +18,10 @@ runs:
       if: ${{ inputs.enable-cache == 'true' }}
       id: get-date
       shell: bash
-      run: echo "date=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+      run: |
+        echo "date=$(/bin/date -u '+%Y%m%d')" >> $GITHUB_OUTPUT
+        # Use week number for longer cache retention
+        echo "week=$(/bin/date -u '+%Y-W%W')" >> $GITHUB_OUTPUT
 
     - name: Cache apt packages
       if: ${{ inputs.enable-cache == 'true' }}
@@ -27,8 +30,9 @@ runs:
         path: |
           /var/cache/apt/archives
           /var/lib/apt/lists
-        key: ${{ runner.os }}-apt-${{ steps.get-date.outputs.date }}
+        key: ${{ runner.os }}-apt-${{ steps.get-date.outputs.week }}-${{ steps.get-date.outputs.date }}
         restore-keys: |
+          ${{ runner.os }}-apt-${{ steps.get-date.outputs.week }}-
           ${{ runner.os }}-apt-
 
     - name: Install system packages
