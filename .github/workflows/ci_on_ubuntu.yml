@@ -200,6 +200,7 @@ jobs:
       matrix:
         python-version: ["3.10"]
         pytorch-version: ["2.7.1"]
+        config-task: ["asr", "asr_transducer", "lm", "ssl", "tts", "enh",  "enh_asr"]
         use-conda: [false]
     steps:
       - uses: actions/checkout@master
@@ -217,7 +218,7 @@ jobs:
         run: ./ci/test_configuration_espnet2.sh
       - uses: codecov/codecov-action@v5
         with:
-          flags: test_configuration_espnet2
+          flags: test_configuration_espnet2 ${{ matrix.config-task }}
 
   test_python_espnet3:
     runs-on: ubuntu-latest
