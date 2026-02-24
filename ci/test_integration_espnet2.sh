@@ -247,8 +247,10 @@ if [ "${task}" == "enh" ] || [ "${task}" == "all" ]; then
     # [ESPnet2] test enh recipe
     # Install ENH dependency
     # ENH + Speech2Text requires s2t dependency
+    echo "::group::Installing ENH dependencies (including Speech2Text) ==="
     python3 -m pip install -e '.[enh]'
     python3 -m pip install -e '.[st]'
+    echo "::endgroup::"
 
     # Run tests
     if python -c 'import torch as t; from packaging.version import parse as L; assert L(t.__version__) >= L("1.2.0")' &> /dev/null; then
