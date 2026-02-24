@@ -34,6 +34,22 @@ run_timed() {
     return ${rc}
 }
 
+timing_block_start() {
+    local label="$1"
+    local start_ts
+    start_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    echo "==== [TIMING][START] ${label} @ ${start_ts} ===="
+}
+
+timing_block_end() {
+    local label="$1"
+    local t0="$2"
+    local end_ts elapsed
+    end_ts="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
+    elapsed=$((SECONDS - t0))
+    echo "==== [TIMING][END] ${label} @ ${end_ts} elapsed=${elapsed}s ===="
+}
+
 #### Make sure chainer-independent ####
 python3 -m pip uninstall -y chainer
 
@@ -44,9 +60,11 @@ python3 test_utils/uninstall_extra.py
 
 # [ESPnet2] test asr recipe
 # Install ASR dependency
-python3 -m pip install -e '.[asr]'
+run_timed "PIP: install [asr]" python3 -m pip install -e '.[asr]'
 
 # Run tests
+timing_block_start "ASR recipe"
+asr_recipe_t0=$SECONDS
 cd ./egs2/mini_an4/asr1
 gen_dummy_coverage
 echo "==== [ESPnet2] ASR ==="
@@ -176,15 +194,18 @@ done
 # Remove generated files in order to reduce the disk usage
 rm -rf exp dump data
 cd "${cwd}"
+timing_block_end "ASR recipe" "${asr_recipe_t0}"
 
 # Uninstall extra dependency
 python3 test_utils/uninstall_extra.py
 
 # [ESPnet2] test tts recipe
 # Install TTS dependency
-python3 -m pip install -e '.[tts]'
+run_timed "PIP: install [tts]" python3 -m pip install -e '.[tts]'
 
 # Run tests
+timing_block_start "TTS recipe"
+tts_recipe_t0=$SECONDS
 cd ./egs2/mini_an4/tts1
 gen_dummy_coverage
 echo "==== [ESPnet2] TTS ==="
@@ -203,13 +224,16 @@ if python3 -c 'import torch as t; from packaging.version import parse as L; asse
     rm -rf exp dump data
 fi
 cd "${cwd}"
+timing_block_end "TTS recipe" "${tts_recipe_t0}"
 # Uninstall extra dependency
 python3 test_utils/uninstall_extra.py
 
 
 # [ESPnet2] test asr2 recipe
 # Install ASR2 dependency
-python3 -m pip install -e '.[asr]'
+run_timed "PIP: install [asr] for ASR2" python3 -m pip install -e '.[asr]'
+timing_block_start "ASR2 recipe"
+asr2_recipe_t0=$SECONDS
 cd ./egs2/mini_an4/asr2
 gen_dummy_coverage
 echo "==== [ESPnet2] ASR2 ==="
@@ -217,6 +241,7 @@ echo "==== [ESPnet2] ASR2 ==="
 # Remove generated files in order to reduce the disk usage
 rm -rf exp dump data
 cd "${cwd}"
+timing_block_end "ASR2 recipe" "${asr2_recipe_t0}"
 # Uninstall extra dependency
 python3 test_utils/uninstall_extra.py
 
@@ -224,11 +249,13 @@ python3 test_utils/uninstall_extra.py
 # [ESPnet2] test enh recipe
 # Install ENH dependency
 # ENH + Speech2Text requires s2t dependency
-python3 -m pip install -e '.[enh]'
-python3 -m pip install -e '.[st]'
+run_timed "PIP: install [enh]" python3 -m pip install -e '.[enh]'
+run_timed "PIP: install [st] for ENH" python3 -m pip install -e '.[st]'
 
 # Run tests
 if python -c 'import torch as t; from packaging.version import parse as L; assert L(t.__version__) >= L("1.2.0")' &> /dev/null; then
+    timing_block_start "ENH recipe"
+    enh_recipe_t0=$SECONDS
     cd ./egs2/mini_an4/enh1
     gen_dummy_coverage
     echo "==== [ESPnet2] ENH ==="
@@ -254,10 +281,13 @@ if python -c 'import torch as t; from packaging.version import parse as L; asser
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
+    timing_block_end "ENH recipe" "${enh_recipe_t0}"
 fi
 
 # [ESPnet2] test enh_tse recipe
 if python -c 'import torch as t; from packaging.version import parse as L; assert L(t.__version__) >= L("1.2.0")' &> /dev/null; then
+    timing_block_start "ENH_TSE recipe"
+    enh_tse_recipe_t0=$SECONDS
     cd ./egs2/mini_an4/tse1
     gen_dummy_coverage
     echo "==== [ESPnet2] ENH_TSE ==="
@@ -277,11 +307,14 @@ if python -c 'import torch as t; from packaging.version import parse as L; asser
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
+    timing_block_end "ENH_TSE recipe" "${enh_tse_recipe_t0}"
 fi
 
 # [ESPnet2] test enh_asr1 recipe
-python3 -m pip install -e '.[asr]'
+run_timed "PIP: install [asr] for ENH_ASR" python3 -m pip install -e '.[asr]'
 if python -c 'import torch as t; from packaging.version import parse as L; assert L(t.__version__) >= L("1.2.0")' &> /dev/null; then
+    timing_block_start "ENH_ASR recipe"
+    enh_asr_recipe_t0=$SECONDS
     cd ./egs2/mini_an4/enh_asr1
     gen_dummy_coverage
     echo "==== [ESPnet2] ENH_ASR ==="
@@ -290,6 +323,7 @@ if python -c 'import torch as t; from packaging.version import parse as L; asser
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
+    timing_block_end "ENH_ASR recipe" "${enh_asr_recipe_t0}"
 fi
 # Uninstall extra dependency
 python3 test_utils/uninstall_extra.py
