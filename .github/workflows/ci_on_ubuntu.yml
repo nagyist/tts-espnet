@@ -168,8 +168,7 @@ jobs:
         python-version: ["3.10", "3.12"]
         pytorch-version: [2.5.1, 2.9.1]
         use-conda: [false]
-        # config-task: ["asr", "tts", "asr2",  "enh", "ssl", "st", "spk", "lid", "s2t", "s2st", "lm", "codec"]
-        config-task: ["asr", "tts", "asr2"]  # Temporarily reduce the number of tasks to avoid OOM errors. Will be fixed after integration tests.
+        config-task: ["asr", "tts", "asr2",  "enh", "ssl", "st", "spk", "lid", "s2t", "s2st", "lm", "codec"]
         exclude:
             - python-version: "3.12"
               pytorch-version: 2.5.1
