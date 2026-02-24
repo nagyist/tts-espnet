@@ -2,6 +2,9 @@
 
 set -euo pipefail
 
+echo "Testing failing on Github Actions. Will activate after cache tests."
+exit 1
+
 source tools/activate_python.sh
 PYTHONPATH="${PYTHONPATH:-}:$(pwd)/tools/s3prl"
 export PYTHONPATH
