@@ -168,6 +168,7 @@ jobs:
         python-version: ["3.10", "3.12"]
         pytorch-version: [2.5.1, 2.9.1]
         use-conda: [false]
+        config-task: ["asr", "tts", "asr2",  "enh", "ssl", "st", "spk", "lid", "s2t", "s2st", "lm", "codec"]
         exclude:
             - python-version: "3.12"
               pytorch-version: 2.5.1
@@ -185,7 +186,7 @@ jobs:
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test espnet2 integration
-        run: ./ci/test_integration_espnet2.sh
+        run: ./ci/test_integration_espnet2.sh ${{ matrix.config-task }}
       - uses: codecov/codecov-action@v5
         with:
           flags: test_integration_espnet2
