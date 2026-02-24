@@ -215,10 +215,10 @@ jobs:
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test configuration
-        run: ./ci/test_configuration_espnet2.sh
+        run: ./ci/test_configuration_espnet2.sh ${{ matrix.config-task }}
       - uses: codecov/codecov-action@v5
         with:
-          flags: test_configuration_espnet2 ${{ matrix.config-task }}
+          flags: test_configuration_espnet2
 
   test_python_espnet3:
     runs-on: ubuntu-latest
