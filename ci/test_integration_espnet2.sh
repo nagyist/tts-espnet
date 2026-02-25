@@ -477,6 +477,10 @@ if [ "${task}" == "codec" ] || [ "${task}" == "all" ]; then
 fi
 
 echo "=== report ==="
-coverage combine egs2/*/*/.coverage
-coverage report -i
-coverage xml -i
+if compgen -G "egs2/*/*/.coverage" > /dev/null; then
+    coverage combine egs2/*/*/.coverage
+    coverage report -i
+    coverage xml -i
+else
+    echo "No coverage files found to combine"
+fi
