@@ -37,11 +37,21 @@ from espnet3.utils.config import load_config_with_defaults
 DUMMY_DATASET_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder." "DummyDataset"
 )
+DUMMY_SAME_LENGTH_DATASET_TARGET = (
+    "test.espnet3.components.data.test_dataloader_builder." "DummyDatasetSameLength"
+)
 DUMMY_SAMPLER_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder." "DummySampler"
 )
 DUMMY_BATCH_SAMPLER_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder." "DummyBatchSampler"
+)
+DUMMY_SHARDED_DATASET_TARGET = (
+    "test.espnet3.components.data.test_dataloader_builder." "DummyShardedDataset"
+)
+DUMMY_MISSING_SHARD_TARGET = (
+    "test.espnet3.components.data.test_dataloader_builder."
+    "DummyMissingShardMethod"
 )
 
 
@@ -150,34 +160,82 @@ def make_standard_dataloader_config(sampler=None, batch_sampler=None, collate_fn
     return OmegaConf.create(config)
 
 
+def make_dataset_config(dataset_target, dataset_kwargs=None):
+    dataset_kwargs = dataset_kwargs or {}
+    config = {
+        "train": [
+            {
+                "name": "train_dummy",
+                "dataset": {"_target_": dataset_target, **dataset_kwargs},
+            }
+        ],
+        "valid": [
+            {
+                "name": "valid_dummy",
+                "dataset": {"_target_": dataset_target, **dataset_kwargs},
+            }
+        ],
+    }
+    return OmegaConf.create(config)
+
+
+def build_organizer(dataset_target, dataset_kwargs=None):
+    config = make_dataset_config(dataset_target, dataset_kwargs=dataset_kwargs)
+    return DataOrganizer(
+        train=instantiate(config["train"]),
+        valid=instantiate(config["valid"]),
+        preprocessor=do_nothing_transform,
+    )
+
+
+def build_builder(dataset, config, collate_fn, num_device, epoch):
+    builder_config = OmegaConf.create(
+        {
+            "_target_": "espnet3.components.data.dataloader.DataLoaderBuilder",
+            "dataset": dataset,
+            "config": config,
+            "collate_fn": collate_fn,
+            "num_device": num_device,
+            "epoch": epoch,
+        }
+    )
+    return instantiate(builder_config)
+
+
 # -------- Standard PyTorch DataLoader mode --------
 
 
 def test_batch_sampler_only():
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config(
         batch_sampler={"_target_": DUMMY_BATCH_SAMPLER_TARGET}
     )
     # We don't need batch size for batch sampler
     del config.dataloader.train.batch_size
     del config.dataloader.train.shuffle
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     loader = builder.build("train")
     assert "DummyBatchSampler" in str(loader.batch_sampler.__class__)
 
 
 def test_sampler_only():
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config(sampler={"_target_": DUMMY_SAMPLER_TARGET})
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     loader = builder.build("train")
     assert "DummySampler" in str(loader.sampler.__class__)
 
 
 def test_collate_fn_none():
-    dataset = DummyDatasetSameLength()
+    organizer = build_organizer(DUMMY_SAME_LENGTH_DATASET_TARGET)
     config = make_standard_dataloader_config()
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     loader = builder.build("train")
     batch = next(iter(loader))
     assert isinstance(batch, dict)
@@ -187,25 +245,12 @@ def test_collate_fn_none():
 def test_common_collate_fn():
     from espnet2.train.collate_fn import CommonCollateFn
 
-    config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
-    }
-    config = OmegaConf.create(config)
-    dataset = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["train"]),
-        preprocessor=do_nothing_transform,
-    )
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config()
     collate_fn = CommonCollateFn(int_pad_value=-1)
-    dataset.train.use_espnet_collator = True
-    builder = DataLoaderBuilder(
-        dataset.train, config, collate_fn=collate_fn, num_device=1, epoch=0
+    organizer.train.use_espnet_collator = True
+    builder = build_builder(
+        organizer.train, config, collate_fn=collate_fn, num_device=1, epoch=0
     )
     loader = builder.build("train")
     batch = next(iter(loader))
@@ -216,10 +261,10 @@ def test_common_collate_fn():
 
 
 def test_custom_collate_fn():
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config()
-    builder = DataLoaderBuilder(
-        dataset, config, collate_fn=dummy_collate_fn, num_device=1, epoch=0
+    builder = build_builder(
+        organizer.train, config, collate_fn=dummy_collate_fn, num_device=1, epoch=0
     )
     loader = builder.build("train")
     batch = next(iter(loader))
@@ -227,12 +272,14 @@ def test_custom_collate_fn():
 
 
 def test_sampler_and_batch_sampler_conflict():
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config(
         sampler={"_target_": DUMMY_SAMPLER_TARGET},
         batch_sampler={"_target_": DUMMY_BATCH_SAMPLER_TARGET},
     )
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     with pytest.raises(
         AssertionError, match="Cannot specify both sampler and batch_sampler"
     ):
@@ -243,20 +290,7 @@ def test_sampler_and_batch_sampler_conflict():
 
 
 def test_iter_factory_from_default_yaml_with_organizer(tmp_path):
-    config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
-    }
-    config = OmegaConf.create(config)
-    dataset = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["train"]),
-        preprocessor=do_nothing_transform,
-    )
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     yaml_text = """
 dataloader:
   train:
@@ -277,9 +311,9 @@ dataloader:
     config_path.write_text(yaml_text)
 
     cfg = load_config_with_defaults(str(config_path))
-    dataset.train.use_espnet_collator = True
-    builder = DataLoaderBuilder(
-        dataset=dataset.train,
+    organizer.train.use_espnet_collator = True
+    builder = build_builder(
+        dataset=organizer.train,
         config=cfg,
         collate_fn=None,  # Defined on config
         num_device=1,
@@ -295,20 +329,7 @@ dataloader:
 def test_iter_factory_with_collate_fn(tmp_path):
     # For this case the collate_fn in configuration is used.
     # The collate_fn in DataloaderBuilder.__init__ is only used in standard dataloader.
-    config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
-    }
-    config = OmegaConf.create(config)
-    dataset = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["train"]),
-        preprocessor=do_nothing_transform,
-    )
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     yaml_text = """
 dataloader:
   train:
@@ -329,9 +350,9 @@ dataloader:
     config_path.write_text(yaml_text)
 
     cfg = load_config_with_defaults(str(config_path))
-    dataset.train.use_espnet_collator = True
-    builder = DataLoaderBuilder(
-        dataset=dataset.train,
+    organizer.train.use_espnet_collator = True
+    builder = build_builder(
+        dataset=organizer.train,
         config=cfg,
         collate_fn=dummy_collate_fn,  # Defined on config
         num_device=1,
@@ -347,10 +368,12 @@ dataloader:
 
 @pytest.mark.parametrize("flag", [True, False])
 def test_multiple_iterator_is_rejected(flag):
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config()
     config.dataloader.train.multiple_iterator = flag
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     with pytest.raises(RuntimeError, match="multiple_iterator"):
         builder.build("train")
 
@@ -372,10 +395,14 @@ def _first_shard_id(loader):
 
 
 def test_sharded_dataset_single_gpu_multiple_shards():
-    dataset = DummyShardedDataset(num_shards=2, world_shard_size=1)
+    organizer = build_organizer(
+        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": 2, "world_shard_size": 1}
+    )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     loader = builder.build("train")
     shard_ids = _collect_shard_ids(loader)
     assert shard_ids == {"shard0", "shard1"}
@@ -402,12 +429,19 @@ def test_sharded_dataset_multi_gpu_assignment(
     monkeypatch.setattr(torch.distributed, "get_world_size", _get_world_size)
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
-    dataset = DummyShardedDataset(
-        num_shards=num_shards, world_shard_size=world_size
+    organizer = build_organizer(
+        DUMMY_SHARDED_DATASET_TARGET,
+        dataset_kwargs={"num_shards": num_shards, "world_shard_size": world_size},
     )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=world_size, epoch=0)
+    builder = build_builder(
+        organizer.train,
+        config,
+        collate_fn=None,
+        num_device=world_size,
+        epoch=0,
+    )
     loader = builder.build("train")
     shard_ids = _collect_shard_ids(loader)
     assert shard_ids == expected
@@ -423,17 +457,19 @@ def test_sharded_dataset_multi_gpu_rotates_with_epoch(monkeypatch):
     monkeypatch.setattr(torch.distributed, "get_world_size", _get_world_size)
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
-    dataset = DummyShardedDataset(num_shards=4, world_shard_size=2)
+    organizer = build_organizer(
+        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": 4, "world_shard_size": 2}
+    )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
 
-    builder_epoch0 = DataLoaderBuilder(
-        dataset, config, collate_fn=None, num_device=2, epoch=0
+    builder_epoch0 = build_builder(
+        organizer.train, config, collate_fn=None, num_device=2, epoch=0
     )
     first_epoch0 = _first_shard_id(builder_epoch0.build("train"))
 
-    builder_epoch1 = DataLoaderBuilder(
-        dataset, config, collate_fn=None, num_device=2, epoch=1
+    builder_epoch1 = build_builder(
+        organizer.train, config, collate_fn=None, num_device=2, epoch=1
     )
     first_epoch1 = _first_shard_id(builder_epoch1.build("train"))
 
@@ -452,18 +488,26 @@ def test_sharded_dataset_invalid_shard_count(monkeypatch, num_shards):
     monkeypatch.setattr(torch.distributed, "get_world_size", _get_world_size)
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
-    dataset = DummyShardedDataset(num_shards=num_shards, world_shard_size=2)
+    organizer = build_organizer(
+        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": num_shards, "world_shard_size": 2}
+    )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=2, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=2, epoch=0
+    )
     with pytest.raises(RuntimeError, match="num_shards must be divisible by world_size"):
         builder.build("train")
 
 
 def test_sharded_dataset_missing_shard_method():
-    dataset = DummyMissingShardMethod(num_shards=2, world_shard_size=1)
+    organizer = build_organizer(
+        DUMMY_MISSING_SHARD_TARGET, dataset_kwargs={"num_shards": 2, "world_shard_size": 1}
+    )
     config = make_standard_dataloader_config()
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     with pytest.raises(RuntimeError, match="shard\\(\\) is not implemented"):
         builder.build("train")
 
@@ -478,8 +522,12 @@ def test_sharded_dataset_world_size_mismatch(monkeypatch):
     monkeypatch.setattr(torch.distributed, "get_world_size", _get_world_size)
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
-    dataset = DummyShardedDataset(num_shards=2, world_shard_size=1)
+    organizer = build_organizer(
+        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": 2, "world_shard_size": 1}
+    )
     config = make_standard_dataloader_config()
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=2, epoch=0)
+    builder = build_builder(
+        organizer.train, config, collate_fn=None, num_device=2, epoch=0
+    )
     with pytest.raises(RuntimeError, match="world_shard_size must match"):
         builder.build("train")
