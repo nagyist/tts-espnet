@@ -50,7 +50,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Make environment
         uses: ./.github/actions/prepare-environment
         with:
@@ -82,7 +82,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test python
@@ -116,7 +116,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test utils
@@ -150,7 +150,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test shell
@@ -182,7 +182,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test espnet2 integration
@@ -212,7 +212,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test configuration
@@ -242,7 +242,7 @@ jobs:
       - uses: actions/cache@v5
         with:
           path: tools
-          key: ${{ runner.os }}-tools-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
+          key: ${{ runner.os }}-tools-${{ github.run_id }}-${{ matrix.python-version }}-${{ matrix.pytorch-version }}-${{ hashFiles('**/pyproject.toml') }}-${{ hashFiles('**/Makefile') }}
       - name: Install System Dependencies
         uses: ./.github/actions/install-system-dependencies
       - name: test python
