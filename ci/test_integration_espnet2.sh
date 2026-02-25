@@ -29,6 +29,13 @@ gen_dummy_coverage(){
     touch empty.py; ${python} empty.py
 }
 
+uninstall_extra_deps(){
+    # Uninstall extra dependency
+    echo "::group::uninstall extra dependencies ==="
+    python3 test_utils/uninstall_extra.py
+    echo "::endgroup::"
+}
+
 pytorch_plus(){
     python3 <<EOF
 from packaging.version import parse as L
@@ -196,8 +203,7 @@ if [ "${task}" == "asr" ] || [ "${task}" == "all" ]; then
     rm -rf exp dump data
     cd "${cwd}"
 
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "tts" ] || [ "${task}" == "all" ]; then
@@ -228,8 +234,8 @@ if [ "${task}" == "tts" ] || [ "${task}" == "all" ]; then
         fi
     echo "::endgroup::"
     cd "${cwd}"
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "asr2" ] || [ "${task}" == "all" ]; then
@@ -240,12 +246,12 @@ if [ "${task}" == "asr2" ] || [ "${task}" == "all" ]; then
     gen_dummy_coverage
     echo "::group::=== [ESPnet2] ASR2 ==="
     ./run.sh --ngpu 0 --stage 1 --stop-stage 15 --skip-packing false --use-lm false --python "${python}" --asr-args "--num_workers 0"
-        # Remove generated files in order to reduce the disk usage
-        rm -rf exp dump data
-        cd "${cwd}"
-        # Uninstall extra dependency
-        python3 test_utils/uninstall_extra.py
+    # Remove generated files in order to reduce the disk usage
+    rm -rf exp dump data
+    cd "${cwd}"
     echo "::endgroup::"
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "enh" ] || [ "${task}" == "all" ]; then
@@ -320,8 +326,8 @@ if [ "${task}" == "enh" ] || [ "${task}" == "all" ]; then
         rm -rf exp dump data
         cd "${cwd}"
     fi
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "ssl" ] || [ "${task}" == "all" ]; then
@@ -374,8 +380,8 @@ if [ "${task}" == "st" ] || [ "${task}" == "all" ]; then
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "spk" ] || [ "${task}" == "all" ]; then
@@ -399,8 +405,8 @@ if [ "${task}" == "spk" ] || [ "${task}" == "all" ]; then
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "lid" ] || [ "${task}" == "all" ]; then
@@ -427,8 +433,8 @@ if [ "${task}" == "s2t" ] || [ "${task}" == "all" ]; then
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data
     cd "${cwd}"
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "s2st" ] || [ "${task}" == "all" ]; then
@@ -455,8 +461,8 @@ if [ "${task}" == "s2st" ] || [ "${task}" == "all" ]; then
     # Remove generated files in order to reduce the disk usage
     rm -rf exp dump data ckpt .cache
     cd "${cwd}"
-    # Uninstall extra dependency
-    python3 test_utils/uninstall_extra.py
+
+    uninstall_extra_deps
 fi
 
 if [ "${task}" == "lm" ] || [ "${task}" == "all" ]; then
@@ -481,7 +487,7 @@ if [ "${task}" == "codec" ] || [ "${task}" == "all" ]; then
     cd "${cwd}"
 fi
 
-echo "=== report ==="
+echo "::group::=== report ==="
 if compgen -G "egs2/*/*/.coverage" > /dev/null; then
     coverage combine egs2/*/*/.coverage
     coverage report -i
@@ -489,3 +495,4 @@ if compgen -G "egs2/*/*/.coverage" > /dev/null; then
 else
     echo "No coverage files found to combine"
 fi
+echo "::endgroup::"

@@ -15,6 +15,11 @@ fi
 source tools/activate_python.sh
 PYTHONPATH="${PYTHONPATH:-}:$(pwd)/tools/s3prl"
 export PYTHONPATH
+# Use sysmon core on Python 3.12+ to avoid sys.settrace performance regression
+# (CPython gh-107674: tracing overhead ~7x on 3.12 vs ~3x on 3.10)
+if python3 -c "import sys; exit(0 if sys.version_info >= (3,12) else 1)"; then
+    export COVERAGE_CORE=sysmon
+fi
 python="coverage run --append"
 
 gen_dummy_coverage(){
