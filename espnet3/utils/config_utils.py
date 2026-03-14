@@ -1,9 +1,14 @@
 """Configuration helpers and OmegaConf resolvers for ESPnet3."""
 
 import logging
+import re
 from pathlib import Path
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
+
+_RELATIVE_RESOLVER_PATTERN = re.compile(
+    r"\$\{(?P<resolver>load_line|load_yaml):(?P<path>[^,}]+)"
+)
 
 
 def load_line(path):
@@ -32,15 +37,52 @@ def load_line(path):
         raise
 
 
+def load_yaml(path, key=None):
+    """Load a YAML file and optionally return a nested key.
+
+    This resolver is intended for pulling a single value from another config,
+    e.g., `${load_yaml:conf/train.yaml,exp_tag}`.
+
+    Args:
+        path (str or Path): Path to the YAML file.
+        key (str, optional): Dot-delimited key to select.
+
+    Returns:
+        Any: The selected value or the full config if key is None.
+    """
+    cfg_path = Path(path)
+    try:
+        cfg = OmegaConf.load(cfg_path)
+    except FileNotFoundError:
+        logging.error(f"File not found: {path}")
+        raise
+    except PermissionError:
+        logging.error(f"Permission denied when accessing file: {path}")
+        raise
+
+    if key is None or str(key).strip() == "":
+        return cfg
+
+    value = OmegaConf.select(cfg, str(key), default=None)
+    if value is None:
+        raise KeyError(f"Key not found in YAML: {key}")
+    return value
+
+
 OMEGACONF_ESPNET3_RESOLVER = {
     "load_line": load_line,
+    "load_yaml": load_yaml,
 }
 for name, resolver in OMEGACONF_ESPNET3_RESOLVER.items():
     OmegaConf.register_new_resolver(name, resolver)
     logging.info(f"Registered ESPnet-3 OmegaConf Resolver: {name}")
 
 
-def _process_dict_config_entry(entry: DictConfig, base_path: Path) -> list:
+def _process_dict_config_entry(
+    entry: DictConfig,
+    base_path: Path,
+    resolve: bool = True,
+) -> list:
     results = []
     for key, val in entry.items():
         # Skip null entries (can be used for disabling config entries)
@@ -51,15 +93,17 @@ def _process_dict_config_entry(entry: DictConfig, base_path: Path) -> list:
         # or use as-is if path includes '/'
         composed = f"{key}/{val}" if "/" not in val else val
         config_path = _build_config_path(base_path, composed)
-        results.append({key: load_config_with_defaults(str(config_path))})
+        results.append(
+            {key: load_config_with_defaults(str(config_path), resolve=resolve)}
+        )
     return results
 
 
-def load_config_with_defaults(path: str) -> OmegaConf:
+def load_config_with_defaults(path: str, resolve: bool = True) -> OmegaConf:
     """Load an YAML config with recursive `_self_` merging via Hydra-style `defaults`.
 
     This function recursively loads and merges dependent YAML files specified
-    in the `defaults` key of the given config. It mimics Hydra’s composition mechanism
+    in the `defaults` key of the given config. It mimics Hydra's composition mechanism
     without using Hydra's runtime, which makes it suitable for standalone YAML handling
     (e.g., for distributed training or script-based training setups).
 
@@ -82,12 +126,14 @@ def load_config_with_defaults(path: str) -> OmegaConf:
 
     Args:
         path (str): Path to the main YAML config file.
+        resolve (bool): Whether to resolve interpolations after merging.
 
     Returns:
         OmegaConf.DictConfig: Fully resolved and merged configuration object.
     """
     base_path = Path(path).parent
     main_config = OmegaConf.load(path)
+    _normalize_relative_resolver_paths(main_config, base_path)
     config_self = main_config.copy()
 
     if "defaults" not in main_config:
@@ -103,10 +149,14 @@ def load_config_with_defaults(path: str) -> OmegaConf:
                 self_merged = True
             else:
                 config_path = _build_config_path(base_path, entry)
-                merged_configs.append(load_config_with_defaults(str(config_path)))
+                merged_configs.append(
+                    load_config_with_defaults(str(config_path), resolve=resolve)
+                )
 
         elif isinstance(entry, DictConfig):
-            merged_configs.extend(_process_dict_config_entry(entry, base_path))
+            merged_configs.extend(
+                _process_dict_config_entry(entry, base_path, resolve=resolve)
+            )
 
         elif entry == "_self_":
             merged_configs.append(config_self)
@@ -116,12 +166,73 @@ def load_config_with_defaults(path: str) -> OmegaConf:
         merged_configs.append(config_self)
 
     final_config = OmegaConf.merge(*merged_configs)
-    OmegaConf.resolve(final_config)
+
+    if resolve:
+        OmegaConf.resolve(final_config)
 
     if "defaults" in final_config:
         del final_config["defaults"]
 
     return final_config
+
+
+def _normalize_relative_resolver_paths(cfg, base_path: Path) -> None:
+    if isinstance(cfg, DictConfig):
+        for key in list(cfg.keys()):
+            value = cfg._get_node(key)
+            if isinstance(value, (DictConfig, ListConfig)):
+                _normalize_relative_resolver_paths(value, base_path)
+            else:
+                raw_value = value._value()
+                if isinstance(raw_value, str):
+                    cfg[key] = _rewrite_relative_resolver_paths(raw_value, base_path)
+    elif isinstance(cfg, ListConfig):
+        for idx in range(len(cfg)):
+            value = cfg._get_node(idx)
+            if isinstance(value, (DictConfig, ListConfig)):
+                _normalize_relative_resolver_paths(value, base_path)
+            else:
+                raw_value = value._value()
+                if isinstance(raw_value, str):
+                    cfg[idx] = _rewrite_relative_resolver_paths(raw_value, base_path)
+
+
+def _rewrite_relative_resolver_paths(value: str, base_path: Path) -> str:
+    def replace(match: re.Match) -> str:
+        resolver = match.group("resolver")
+        raw_path = match.group("path").strip()
+
+        quote = ""
+        normalized_path = raw_path
+        if (
+            len(raw_path) >= 2
+            and raw_path[0] == raw_path[-1]
+            and raw_path[0]
+            in (
+                "'",
+                '"',
+            )
+        ):
+            quote = raw_path[0]
+            normalized_path = raw_path[1:-1].strip()
+
+        # Leave dynamic or already-absolute paths untouched.
+        if "${" in normalized_path or Path(normalized_path).is_absolute():
+            return match.group(0)
+
+        base_relative_path = base_path / normalized_path
+        workspace_relative_path = Path(normalized_path)
+        if normalized_path.startswith(("./", "../")) or base_relative_path.exists():
+            resolved_path = base_relative_path.absolute().as_posix()
+        elif workspace_relative_path.exists():
+            resolved_path = workspace_relative_path.absolute().as_posix()
+        else:
+            resolved_path = base_relative_path.absolute().as_posix()
+        if quote:
+            resolved_path = f"{quote}{resolved_path}{quote}"
+        return f"${{{resolver}:{resolved_path}"
+
+    return _RELATIVE_RESOLVER_PATTERN.sub(replace, value)
 
 
 def _build_config_path(base_path: Path, entry: str) -> Path:
@@ -134,3 +245,5 @@ def _build_config_path(base_path: Path, entry: str) -> Path:
     if not entry_path.suffix:
         entry += ".yaml"
     return base_path / entry
+
+

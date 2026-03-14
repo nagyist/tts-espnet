@@ -1,9 +1,15 @@
 import os
 
 import pytest
+from omegaconf import OmegaConf
 from yaml.parser import ParserError
 
-from espnet3.utils.config_utils import load_config_with_defaults, load_line
+from espnet3.utils.config_utils import (
+    load_config_with_defaults,
+    load_line,
+    load_yaml,
+)
+
 
 # ===============================================================
 # Test Case Summary for Config Utilities
@@ -241,6 +247,28 @@ foo: bar
     assert "defaults" not in cfg
 
 
+def test_load_yaml_relative_path_survives_merge(write_yaml):
+    write_yaml(
+        "conf/training.yaml",
+        """
+exp_dir: ./exp/train_debug
+dataset_dir: ./data/mini_an4
+""",
+    )
+    path = write_yaml(
+        "conf/inference.yaml",
+        """
+exp_dir: ${load_yaml:training.yaml,exp_dir}
+dataset_dir: ${load_yaml:training.yaml,dataset_dir}
+""",
+    )
+    cfg = load_config_with_defaults(str(path))
+    merged = OmegaConf.merge(OmegaConf.create({"provider": {"name": "dummy"}}), cfg)
+
+    assert merged.exp_dir == "./exp/train_debug"
+    assert merged.dataset_dir == "./data/mini_an4"
+
+
 def test_missing_file_raises(tmp_path):
     """Test that loading a config with a missing file in `defaults`
 
@@ -277,3 +305,35 @@ defaults:
 
     with pytest.raises(ParserError):
         load_config_with_defaults(str(main_path))
+
+
+def test_load_yaml_full_config(write_yaml):
+    path = write_yaml(
+        "config.yaml",
+        """
+foo:
+  bar: 123
+""",
+    )
+    cfg = load_yaml(str(path))
+    assert cfg.foo.bar == 123
+
+
+def test_load_yaml_nested_key(write_yaml):
+    path = write_yaml(
+        "config.yaml",
+        """
+foo:
+  bar: 123
+""",
+    )
+    value = load_yaml(str(path), "foo.bar")
+    assert value == 123
+
+
+def test_load_yaml_missing_key_raises(write_yaml):
+    path = write_yaml("config.yaml", "foo: 1\n")
+    with pytest.raises(KeyError):
+        load_yaml(str(path), "missing.key")
+
+
