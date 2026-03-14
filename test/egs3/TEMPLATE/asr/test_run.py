@@ -2,26 +2,13 @@ from pathlib import Path
 
 import pytest
 
-from egs3.TEMPLATE.asr.run import _load_and_merge_config
 from espnet3.utils.config_utils import (
-    _resolve_template_config_filename,
-    load_template_defaults,
+    load_and_merge_config,
+    load_default_config,
 )
 
-
-def test_resolve_template_config_filename() -> None:
-    assert _resolve_template_config_filename("training_config") == "training.yaml"
-    assert _resolve_template_config_filename("inference_config") == "inference.yaml"
-    assert _resolve_template_config_filename("metrics_config") == "metrics.yaml"
-
-
-def test_resolve_template_config_filename_invalid() -> None:
-    with pytest.raises(ValueError, match="Unknown config argument name"):
-        _resolve_template_config_filename("bad_config")
-
-
-def test_load_template_defaults_train_contains_expected_targets() -> None:
-    cfg = load_template_defaults("training_config", "egs3.TEMPLATE.asr")
+def test_load_default_config_train_contains_expected_targets() -> None:
+    cfg = load_default_config("training.yaml", "egs3.TEMPLATE.asr")
     assert (
         cfg.dataset._target_ == "espnet3.components.data.data_organizer.DataOrganizer"
     )
@@ -29,8 +16,8 @@ def test_load_template_defaults_train_contains_expected_targets() -> None:
     assert cfg.scheduler._target_ == "espnet2.schedulers.warmup_lr.WarmupLR"
 
 
-def test_load_template_defaults_infer_contains_expected_targets() -> None:
-    cfg = load_template_defaults("inference_config", "egs3.TEMPLATE.asr")
+def test_load_default_config_infer_contains_expected_targets() -> None:
+    cfg = load_default_config("inference.yaml", "egs3.TEMPLATE.asr")
     assert (
         cfg.provider._target_
         == "espnet3.systems.base.inference_provider.InferenceProvider"
@@ -53,10 +40,10 @@ optimizer:
         encoding="utf-8",
     )
 
-    cfg = _load_and_merge_config(
+    cfg = load_and_merge_config(
         user,
-        "training_config",
-        template_package="egs3.TEMPLATE.asr",
+        "training.yaml",
+        default_package="egs3.TEMPLATE.asr",
     )
 
     assert cfg is not None
@@ -71,10 +58,10 @@ optimizer:
 
 def test_load_and_merge_config_none_path_returns_none() -> None:
     assert (
-        _load_and_merge_config(
+        load_and_merge_config(
             None,
-            "metrics_config",
-            template_package="egs3.TEMPLATE.asr",
+            "metrics.yaml",
+            default_package="egs3.TEMPLATE.asr",
         )
         is None
     )

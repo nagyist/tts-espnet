@@ -7,10 +7,10 @@ from yaml.parser import ParserError
 from espnet3.utils.config_utils import (
     _build_config_path,
     _ensure_target_convert_all,
+    load_default_config,
     load_and_merge_config,
     load_config_with_defaults,
     load_line,
-    load_template_defaults,
     load_yaml,
 )
 
@@ -340,14 +340,14 @@ def test_load_yaml_missing_key_raises(write_yaml):
         load_yaml(str(path), "missing.key")
 
 
-def test_load_template_defaults_train():
-    cfg = load_template_defaults("conf/training.yaml", "egs3.TEMPLATE.asr")
+def test_load_default_config_train():
+    cfg = load_default_config("training.yaml", "egs3.TEMPLATE.asr")
     assert "dataset" in cfg
     assert "exp_dir" in cfg
 
 
 def test_load_and_merge_config_none():
-    assert load_and_merge_config(None, "conf/metrics.yaml") is None
+    assert load_and_merge_config(None, "metrics.yaml") is None
 
 
 def test_load_and_merge_config_resolves_user_reference_to_template_value(
@@ -368,14 +368,14 @@ custom_dir: ${exp_dir}/custom
     )
 
     monkeypatch.setattr(
-        "espnet3.utils.config_utils.load_template_defaults",
+        "espnet3.utils.config_utils.load_default_config",
         lambda _, __: load_config_with_defaults(str(template), resolve=False),
     )
 
     cfg = load_and_merge_config(
         user,
-        "conf/training.yaml",
-        template_package="dummy.package",
+        "training.yaml",
+        default_package="dummy.package",
     )
 
     assert cfg.exp_dir == "./exp/from_template"
@@ -401,14 +401,14 @@ exp_dir: ./exp/from_user
     )
 
     monkeypatch.setattr(
-        "espnet3.utils.config_utils.load_template_defaults",
+        "espnet3.utils.config_utils.load_default_config",
         lambda _, __: load_config_with_defaults(str(template), resolve=False),
     )
 
     cfg = load_and_merge_config(
         user,
-        "conf/training.yaml",
-        template_package="dummy.package",
+        "training.yaml",
+        default_package="dummy.package",
     )
 
     assert cfg.exp_dir == "./exp/from_user"
