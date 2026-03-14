@@ -66,8 +66,9 @@ def load_yaml(path, key=None):
     so both values can be loaded without using an absolute path.
 
     Note:
-        Resolver paths must be written without surrounding quotes.
-        Use `${load_yaml:training.yaml,exp_tag}`.
+        Resolver paths are usually written without surrounding quotes, such as
+        `${load_yaml:training.yaml,exp_tag}`. Quoted paths are also supported
+        when the path contains spaces.
 
     Args:
         path (str or Path): Path to the YAML file.
@@ -356,16 +357,32 @@ def _rewrite_relative_resolver_paths(value: str, base_path: Path) -> str:
 
     def replace(match: re.Match) -> str:
         resolver = match.group("resolver")
-        normalized_path = match.group("path").strip()
+        quote, normalized_path = _split_optional_quotes(match.group("path").strip())
 
         # Leave dynamic or already-absolute paths untouched.
         if "${" in normalized_path or Path(normalized_path).is_absolute():
             return match.group(0)
 
         resolved_path = (base_path / normalized_path).absolute().as_posix()
+        # Keep the original quote style because absolute paths may contain
+        # spaces on Windows or in user-managed workspaces.
+        if quote:
+            resolved_path = f"{quote}{resolved_path}{quote}"
         return f"${{{resolver}:{resolved_path}"
 
     return _RELATIVE_RESOLVER_PATTERN.sub(replace, value)
+
+
+def _split_optional_quotes(raw_path: str) -> tuple[str, str]:
+    # Resolver paths may be quoted when the path contains spaces. Preserve the
+    # quote style so the rewritten resolver expression remains parseable.
+    if (
+        len(raw_path) >= 2
+        and raw_path[0] == raw_path[-1]
+        and raw_path[0] in ("'", '"')
+    ):
+        return raw_path[0], raw_path[1:-1].strip()
+    return "", raw_path
 
 
 def _build_config_path(base_path: Path, entry: str) -> Path:

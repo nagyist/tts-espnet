@@ -272,6 +272,25 @@ dataset_dir: ${load_yaml:training.yaml,dataset_dir}
     assert merged.dataset_dir == "./data/mini_an4"
 
 
+def test_load_yaml_quoted_relative_path_with_spaces(write_yaml):
+    write_yaml(
+        "conf dir/training config.yaml",
+        """
+exp_tag: train_debug
+""",
+    )
+    path = write_yaml(
+        "conf dir/inference.yaml",
+        """
+exp_tag: ${load_yaml:"training config.yaml",exp_tag}
+""",
+    )
+
+    cfg = load_config_with_defaults(str(path))
+
+    assert cfg.exp_tag == "train_debug"
+
+
 def test_missing_file_raises(tmp_path):
     """Test that loading a config with a missing file in `defaults`
 
