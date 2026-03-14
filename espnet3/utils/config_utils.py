@@ -2,6 +2,7 @@
 
 import logging
 import re
+from importlib import resources
 from pathlib import Path
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
@@ -173,7 +174,53 @@ def load_config_with_defaults(path: str, resolve: bool = True) -> OmegaConf:
     if "defaults" in final_config:
         del final_config["defaults"]
 
+    _ensure_target_convert_all(final_config)
     return final_config
+
+
+def load_template_defaults(
+    template_config_path: str,
+    template_package: str,
+):
+    """Load packaged TEMPLATE defaults by config kind."""
+    resource = resources.files(template_package).joinpath(
+        *Path(template_config_path).parts
+    )
+    with resources.as_file(resource) as path:
+        return load_config_with_defaults(str(path), resolve=False)
+
+
+def load_and_merge_config(
+    config_path: Path | None,
+    template_config_path: str,
+    template_package: str | None = None,
+):
+    """Load user config and merge it with TEMPLATE defaults."""
+    if config_path is None:
+        return None
+    if template_package is None:
+        template_package = _infer_template_package_from_config_path(config_path)
+    if template_package is None:
+        raise ValueError(
+            "template_package is required when it cannot be inferred from config_path"
+        )
+    default_cfg = load_template_defaults(template_config_path, template_package)
+    user_cfg = load_config_with_defaults(str(config_path), resolve=False)
+    merged_cfg = OmegaConf.merge(default_cfg, user_cfg)
+    OmegaConf.resolve(merged_cfg)
+    _ensure_target_convert_all(merged_cfg)
+    return merged_cfg
+
+
+def _ensure_target_convert_all(cfg) -> None:
+    if isinstance(cfg, DictConfig):
+        if "_target_" in cfg:
+            cfg["_convert_"] = "all"
+        for value in cfg.values():
+            _ensure_target_convert_all(value)
+    elif isinstance(cfg, ListConfig):
+        for value in cfg:
+            _ensure_target_convert_all(value)
 
 
 def _normalize_relative_resolver_paths(cfg, base_path: Path) -> None:
@@ -247,3 +294,20 @@ def _build_config_path(base_path: Path, entry: str) -> Path:
     return base_path / entry
 
 
+def _infer_template_package_from_config_path(config_path: Path) -> str | None:
+    parts = config_path.resolve().parts
+    try:
+        egs3_index = parts.index("egs3")
+    except ValueError:
+        return None
+
+    conf_index = None
+    for index in range(egs3_index + 1, len(parts)):
+        if parts[index] == "conf":
+            conf_index = index
+            break
+    if conf_index is None or conf_index - egs3_index < 3:
+        return None
+
+    task_name = parts[conf_index - 1]
+    return f"egs3.TEMPLATE.{task_name}"
