@@ -28,11 +28,14 @@ class _MockConfig:
 
 @pytest.fixture
 def text_io():
-    with patch(
-        "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoTokenizer"
-    ) as mock_at, patch(
-        "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoConfig"
-    ) as mock_ac:
+    with (
+        patch(
+            "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoTokenizer"
+        ) as mock_at,
+        patch(
+            "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoConfig"
+        ) as mock_ac,
+    ):
         mock_at.from_pretrained.return_value = _MockTokenizer()
         mock_ac.from_pretrained.return_value = _MockConfig()
         io = HuggingFaceTextIO(tokenizer_name="mock-tokenizer")
@@ -68,8 +71,7 @@ class TestHuggingFaceTextIO:
         assert length > 0
 
     def test_decode_batch(self, text_io):
-        tokens_1stream = torch.tensor([[[1], [2], [3]],
-                                       [[4], [5], [0]]])
+        tokens_1stream = torch.tensor([[[1], [2], [3]], [[4], [5], [0]]])
         lengths = torch.tensor([3, 2])
         result = text_io.decode_batch(tokens_1stream, lengths)
         assert isinstance(result, list)
@@ -95,11 +97,14 @@ class TestHuggingFaceTextIO:
         assert weights == [1.0]
 
     def test_copy_for_worker(self, text_io):
-        with patch(
-            "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoTokenizer"
-        ) as mock_at, patch(
-            "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoConfig"
-        ) as mock_ac:
+        with (
+            patch(
+                "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoTokenizer"
+            ) as mock_at,
+            patch(
+                "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoConfig"
+            ) as mock_ac,
+        ):
             mock_at.from_pretrained.return_value = _MockTokenizer()
             mock_ac.from_pretrained.return_value = _MockConfig()
             copy = text_io.copy_for_worker()
