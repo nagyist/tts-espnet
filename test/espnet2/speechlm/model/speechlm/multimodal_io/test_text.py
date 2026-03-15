@@ -1,5 +1,7 @@
 """Tests for HuggingFaceTextIO."""
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 import torch
@@ -7,16 +9,41 @@ import torch
 from espnet2.speechlm.model.speechlm.multimodal_io.text import HuggingFaceTextIO
 
 
+class _MockTokenizer:
+    """Lightweight tokenizer mock that works with or without real transformers."""
+
+    def encode(self, text, **kwargs):
+        return list(range(min(len(text.split()) + 2, 50)))
+
+    def decode(self, token_ids, **kwargs):
+        return " ".join(f"w{i}" for i in token_ids)
+
+    def get_vocab(self):
+        return {f"tok_{i}": i for i in range(80)}
+
+
+class _MockConfig:
+    vocab_size = 100
+
+
 @pytest.fixture
 def text_io():
-    return HuggingFaceTextIO(tokenizer_name="mock-tokenizer")
+    with patch(
+        "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoTokenizer"
+    ) as mock_at, patch(
+        "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoConfig"
+    ) as mock_ac:
+        mock_at.from_pretrained.return_value = _MockTokenizer()
+        mock_ac.from_pretrained.return_value = _MockConfig()
+        io = HuggingFaceTextIO(tokenizer_name="mock-tokenizer")
+    return io
 
 
 class TestHuggingFaceTextIO:
     def test_init_attributes(self, text_io):
         assert text_io.modality == "text"
         assert text_io.is_discrete is True
-        assert text_io.vocab_size == 100  # from MockConfig
+        assert text_io.vocab_size == 100
 
     def test_preprocess_returns_correct_types(self, text_io):
         seq, conti_feat, loss_mask = text_io.preprocess("hello world test")
@@ -41,9 +68,6 @@ class TestHuggingFaceTextIO:
         assert length > 0
 
     def test_decode_batch(self, text_io):
-        tokens = torch.tensor([[[1, 0], [2, 0], [3, 0]],
-                               [[4, 0], [5, 0], [0, 0]]])
-        # shape [2, 3, 2] — but text uses single stream so [B, T, 1+]
         tokens_1stream = torch.tensor([[[1], [2], [3]],
                                        [[4], [5], [0]]])
         lengths = torch.tensor([3, 2])
@@ -71,7 +95,14 @@ class TestHuggingFaceTextIO:
         assert weights == [1.0]
 
     def test_copy_for_worker(self, text_io):
-        copy = text_io.copy_for_worker()
+        with patch(
+            "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoTokenizer"
+        ) as mock_at, patch(
+            "espnet2.speechlm.model.speechlm.multimodal_io.text.AutoConfig"
+        ) as mock_ac:
+            mock_at.from_pretrained.return_value = _MockTokenizer()
+            mock_ac.from_pretrained.return_value = _MockConfig()
+            copy = text_io.copy_for_worker()
         assert isinstance(copy, HuggingFaceTextIO)
         assert copy is not text_io
         assert copy.tokenizer_name == text_io.tokenizer_name
