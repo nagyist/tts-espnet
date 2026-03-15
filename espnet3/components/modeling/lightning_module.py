@@ -5,14 +5,16 @@ from pathlib import Path
 
 import lightning
 import torch
+from humanfriendly import format_number, format_size
 from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 from espnet2.train.collate_fn import CommonCollateFn
 from espnet3.components.data.collect_stats import collect_stats
 from espnet3.components.data.dataloader import DataLoaderBuilder
-from espnet3.components.optim.multiple_optim import MultipleOptim
-from espnet3.components.optim.multiple_scheduler import MultipleScheduler
+from espnet3.components.optimizers.multiple_optimizer import MultipleOptimizer
+from espnet3.components.optimizers.multiple_scheduler import MultipleScheduler
+from espnet3.utils.logging_utils import log_component, log_stage
 
 logger = logging.getLogger("lightning")
 
@@ -46,6 +48,8 @@ class ESPnetLightningModule(lightning.LightningModule):
         self.config = config
         self.model = model
         data_organizer = instantiate(config.dataset)
+
+        data_organizer.log_summary(logger)
         self.train_dataset = data_organizer.train
         self.valid_dataset = data_organizer.valid
         self.nan_countdown = 0
@@ -190,7 +194,7 @@ class ESPnetLightningModule(lightning.LightningModule):
         1. Single Optimizer + Scheduler:
         Use when the entire model is trained with a single optimizer.
         ```yaml
-        optim:
+        optimizer:
             _target_: torch.optim.Adam
             lr: 0.001
 
@@ -205,12 +209,12 @@ class ESPnetLightningModule(lightning.LightningModule):
         key indicating a substring to match parameter names.
 
         ```yaml
-        optims:
-            - optim:
+        optimizers:
+            - optimizer:
                 _target_: torch.optim.Adam
                 lr: 0.001
               params: encoder
-            - optim:
+            - optimizer:
                 _target_: torch.optim.SGD
                 lr: 0.01
               params: decoder
@@ -225,15 +229,16 @@ class ESPnetLightningModule(lightning.LightningModule):
         ```
 
         Notes:
-            * Only one of `optim` or `optims` may be specified. Mixing is not allowed.
+            * Only one of `optimizer` or `optimizers` may be specified.
+                Mixing is not allowed.
             * Likewise, `scheduler` and `schedulers` must not be used together.
-            * When using `optims`, each `params` must uniquely match a subset of
+            * When using `optimizers`, each `params` must uniquely match a subset of
                 trainable parameters.
             * It is an error if:
                 * A trainable parameter is assigned to multiple optimizers
                     (overlapping `params`)
                 * A trainable parameter is not assigned to any optimizer
-                * Any optimizer block is missing `params` or nested `optim`
+                * Any optimizer block is missing `params` or nested `optimizer`
 
         Returns:
             dict: A dictionary with keys `"optimizer"` and `"lr_scheduler"`
@@ -243,16 +248,16 @@ class ESPnetLightningModule(lightning.LightningModule):
             AssertionError: If configuration rules are violated.
             ValueError: If neither optimizer configuration is provided.
         """
-        if getattr(self.config, "optim", None) and getattr(
+        if getattr(self.config, "optimizer", None) and getattr(
             self.config, "scheduler", None
         ):
             # setup optimizer and scheduler
             assert (
-                getattr(self.config, "optims", None) is None
-            ), "Mixture of `optim` and `optims` is not allowed."
+                getattr(self.config, "optimizers", None) is None
+            ), "Mixture of `optimizer` and `optimizers` is not allowed."
             params = filter(lambda p: p.requires_grad, self.parameters())
             optimizer = instantiate(
-                OmegaConf.to_container(self.config.optim, resolve=True), params
+                OmegaConf.to_container(self.config.optimizer, resolve=True), params
             )
 
             assert (
@@ -263,19 +268,19 @@ class ESPnetLightningModule(lightning.LightningModule):
                 optimizer=optimizer,
             )
 
-        elif getattr(self.config, "optims", None) and getattr(
+        elif getattr(self.config, "optimizers", None) and getattr(
             self.config, "schedulers", None
         ):
             assert (
-                getattr(self.config, "optim", None) is None
-            ), "Mixture of `optim` and `optims` is not allowed."
-            assert len(self.config.optims) == len(self.config.schedulers), (
+                getattr(self.config, "optimizer", None) is None
+            ), "Mixture of `optimizer` and `optimizers` is not allowed."
+            assert len(self.config.optimizers) == len(self.config.schedulers), (
                 "The number of optimizers and schedulers must be equal: "
-                + f"optims: {len(self.config.optims)}, "
+                + f"optimizers: {len(self.config.optimizers)}, "
                 + f"schedulers: {len(self.config.schedulers)}"
             )
 
-            optims = []
+            optimizers = []
             trainable_params = {
                 name: param
                 for name, param in self.named_parameters()
@@ -283,24 +288,24 @@ class ESPnetLightningModule(lightning.LightningModule):
             }  # key: name, value: param
             used_param_ids = set()
 
-            for optim_cfg in self.config.optims:
-                assert "params" in optim_cfg, "missing 'params' in optim config"
-                assert "optim" in optim_cfg, "missing nested 'optim' block"
+            for optim_config in self.config.optimizers:
+                assert "params" in optim_config, "missing 'params' in optimizer config"
+                assert "optimizer" in optim_config, "missing nested 'optimizer' block"
 
                 # filter parameters whose name contains the 'params' keyword
                 selected = [
                     p
                     for name, p in trainable_params.items()
-                    if optim_cfg["params"] in name
+                    if optim_config["params"] in name
                 ]
                 selected_names = [
                     name
                     for name in trainable_params.keys()
-                    if optim_cfg["params"] in name
+                    if optim_config["params"] in name
                 ]
                 assert (
                     len(selected) > 0
-                ), f"No trainable parameters found for: {optim_cfg['params']}"
+                ), f"No trainable parameters found for: {optim_config['params']}"
 
                 for n in selected_names:
                     assert (
@@ -308,10 +313,11 @@ class ESPnetLightningModule(lightning.LightningModule):
                     ), f"Parameter {n} is assigned to multiple optimizers"
                     used_param_ids.add(n)
 
-                optim = instantiate(
-                    OmegaConf.to_container(optim_cfg["optim"], resolve=True), selected
+                optimizer = instantiate(
+                    OmegaConf.to_container(optim_config["optimizer"], resolve=True),
+                    selected,
                 )
-                optims.append(optim)
+                optimizers.append(optimizer)
 
             # Check for uncovered parameters
             all_param_ids = {
@@ -322,7 +328,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 not unused_param_ids
             ), f"{unused_param_ids} are not assigned to any optimizer"
 
-            optimizer = MultipleOptim(optims)
+            optimizer = MultipleOptimizer(optimizers)
 
             assert (
                 getattr(self.config, "scheduler", None) is None
@@ -332,7 +338,7 @@ class ESPnetLightningModule(lightning.LightningModule):
                 schedulers.append(
                     instantiate(
                         OmegaConf.to_container(scheduler.scheduler, resolve=True),
-                        optimizer=optims[i_sch],
+                        optimizer=optimizers[i_sch],
                     )
                 )
 
@@ -342,9 +348,17 @@ class ESPnetLightningModule(lightning.LightningModule):
             ]
         else:
             raise ValueError(
-                "Must specify either `optim` or `optims` and `scheduler` or"
+                "Must specify either `optimizer` or `optimizers` and `scheduler` or"
                 "`schedulers`"
             )
+
+        self._log_training_summary(
+            logger,
+            self.model,
+            optimizer=optimizer,
+            scheduler=scheduler,
+        )
+
         return {
             "optimizer": optimizer,
             "lr_scheduler": {
@@ -352,6 +366,134 @@ class ESPnetLightningModule(lightning.LightningModule):
                 "interval": "step",  # assuming lr scheduler is updated per step
             },
         }
+
+    @staticmethod
+    def _log_training_summary(
+        logger: logging.Logger,
+        model,
+        optimizer=None,
+        scheduler=None,
+    ) -> None:
+        """Log model/optimizer/scheduler details for training runs.
+
+        Description:
+            Emits a compact summary of the model, parameter counts, dtype
+            composition, and optimizer/scheduler configuration. This mirrors the
+            previous utility implementation but keeps logging close to where
+            the training loop is configured.
+
+        Args:
+            logger (logging.Logger): Logger used to emit messages.
+            model: PyTorch model to summarize.
+            optimizer: Optimizer instance or wrapper.
+            scheduler: Scheduler instance or list of schedulers.
+
+        Returns:
+            None
+
+        Notes:
+            - Uses `format_number` and `format_size` to improve readability.
+            - The summary is logged at INFO level.
+
+        Examples:
+            ```python
+            self._log_training_summary(logger, self.model, optimizer, scheduler)
+            ```
+
+            Sample output:
+            ```
+            Model summary:
+                Class Name: DummyModel
+                Total Number of model parameters: 1,024
+                Trainable model parameters: 1,024 (100.0%)
+                Model size: 4.0 KB
+                DType composition: torch.float32(100.0%)
+            Optimizer[0]:
+            Scheduler[0]:
+            ```
+
+        Raises:
+            None
+        """
+        logger.log(logging.INFO, "Model:\n%r", model, stacklevel=2)
+
+        params = list(model.parameters())
+        total_params = sum(p.numel() for p in params)
+        trainable_params = sum(p.numel() for p in params if p.requires_grad)
+        size_bytes = sum(p.numel() * p.element_size() for p in params)
+
+        dtype_counts: dict[str, int] = {}
+        for p in params:
+            dtype_counts[str(p.dtype)] = dtype_counts.get(str(p.dtype), 0) + p.numel()
+        dtype_items = sorted(dtype_counts.items(), key=lambda kv: kv[1], reverse=True)
+        dtype_desc = ", ".join(
+            f"{k}({v / total_params * 100:.1f}%)" for k, v in dtype_items
+        )
+
+        logger.log(logging.INFO, "Model summary:", stacklevel=2)
+        logger.log(
+            logging.INFO, "    Class Name: %s", type(model).__name__, stacklevel=2
+        )
+        logger.log(
+            logging.INFO,
+            "    Total Number of model parameters: %s",
+            format_number(total_params),
+            stacklevel=2,
+        )
+        logger.log(
+            logging.INFO,
+            "    Trainable model parameters: %s (%.1f%%)",
+            format_number(trainable_params),
+            (trainable_params / total_params * 100.0) if total_params else 0.0,
+            stacklevel=2,
+        )
+        logger.log(
+            logging.INFO,
+            "    Model size: %s",
+            format_size(size_bytes),
+            stacklevel=2,
+        )
+        logger.log(
+            logging.INFO,
+            "    DType composition: %s",
+            dtype_desc,
+            stacklevel=2,
+        )
+
+        if optimizer is None and scheduler is None:
+            return
+
+        if isinstance(optimizer, MultipleOptimizer):
+            optimizers = list(optimizer.optimizers)
+        elif isinstance(optimizer, list):
+            optimizers = optimizer
+        else:
+            optimizers = [optimizer]
+        for idx, optim in enumerate(optimizers):
+            logger.log(logging.INFO, "Optimizer[%d]:", idx, stacklevel=2)
+            log_component(
+                logger,
+                kind="Optimizer",
+                label=str(idx),
+                obj=optim,
+                max_depth=2,
+            )
+
+        if scheduler is None:
+            return
+        if isinstance(scheduler, list):
+            schedulers = scheduler
+        else:
+            schedulers = [scheduler]
+        for idx, sch in enumerate(schedulers):
+            logger.log(logging.INFO, "Scheduler[%d]:", idx, stacklevel=2)
+            log_component(
+                logger,
+                kind="Scheduler",
+                label=str(idx),
+                obj=sch,
+                max_depth=2,
+            )
 
     def train_dataloader(self):
         """Build the training DataLoader using ESPnet's DataLoaderBuilder.
@@ -369,7 +511,8 @@ class ESPnetLightningModule(lightning.LightningModule):
             num_device=self.config.num_device,
             epoch=self.current_epoch,
         )
-        return builder.build(mode="train")
+        with log_stage("train"):
+            return builder.build(mode="train")
 
     def val_dataloader(self):
         """Build the validation DataLoader using ESPnet's DataLoaderBuilder.
@@ -387,7 +530,8 @@ class ESPnetLightningModule(lightning.LightningModule):
             num_device=self.config.num_device,
             epoch=self.current_epoch,
         )
-        return builder.build(mode="valid")
+        with log_stage("valid"):
+            return builder.build(mode="valid")
 
     def state_dict(self, *args, **kwargs):
         """Return the state dict of the model."""
@@ -400,20 +544,29 @@ class ESPnetLightningModule(lightning.LightningModule):
     def collect_stats(self):
         """Collect training and validation statistics using ESPnet's collect_stats.
 
-        Requires `config.statsdir` to be defined. Saves stats under this directory.
+        Requires `config.stats_dir` to be defined. Saves stats under this directory.
 
         Raises:
-            AssertionError: If `config.statsdir` is not provided.
+            AssertionError: If `config.stats_dir` is not provided.
         """
-        assert hasattr(self.config, "statsdir"), "config.statsdir must be defined"
+        assert hasattr(self.config, "stats_dir"), "config.stats_dir must be defined"
+
+        # Detach dataset/dataloader configs from the root so interpolations like
+        # ${dataset_dir} remain resolved when used standalone during collection.
+        dataset_config = OmegaConf.create(
+            OmegaConf.to_container(self.config.dataset, resolve=True)
+        )
+        dataloader_config = OmegaConf.create(
+            OmegaConf.to_container(self.config.dataloader, resolve=True)
+        )
 
         for mode in ["train", "valid"]:
             collect_stats(
                 model_config=OmegaConf.to_container(self.config.model, resolve=True),
-                dataset_config=self.config.dataset,
-                dataloader_config=self.config.dataloader,
+                dataset_config=dataset_config,
+                dataloader_config=dataloader_config,
                 mode=mode,
-                output_dir=Path(self.config.statsdir),
+                output_dir=Path(self.config.stats_dir),
                 task=getattr(self.config, "task", None),
                 parallel_config=(
                     None
