@@ -1,9 +1,10 @@
 """Tests for KmeansModel, DiscreteAudioIO, and ContinuousAudioIO."""
 
+from unittest.mock import patch
+
 import numpy as np
 import pytest
 import torch
-from unittest.mock import patch
 
 from espnet2.speechlm.model.speechlm.multimodal_io.audio import (
     ContinuousAudioIO,
@@ -59,9 +60,11 @@ class TestKmeansModel:
 @pytest.fixture
 def ssl_only_io():
     """DiscreteAudioIO with SSL only (no codec)."""
-    with patch.object(DiscreteAudioIO, "_init_codec"), \
-         patch.object(DiscreteAudioIO, "_init_ssl"), \
-         patch.object(DiscreteAudioIO, "_init_sanity_check"):
+    with (
+        patch.object(DiscreteAudioIO, "_init_codec"),
+        patch.object(DiscreteAudioIO, "_init_ssl"),
+        patch.object(DiscreteAudioIO, "_init_sanity_check"),
+    ):
         io = DiscreteAudioIO(ssl_choice="ESPnet", ssl_hf_model_tag="espnet/xeus")
 
     io.codec_model = None
@@ -86,9 +89,11 @@ def ssl_only_io():
 @pytest.fixture
 def codec_only_io():
     """DiscreteAudioIO with codec only (no SSL)."""
-    with patch.object(DiscreteAudioIO, "_init_codec"), \
-         patch.object(DiscreteAudioIO, "_init_ssl"), \
-         patch.object(DiscreteAudioIO, "_init_sanity_check"):
+    with (
+        patch.object(DiscreteAudioIO, "_init_codec"),
+        patch.object(DiscreteAudioIO, "_init_ssl"),
+        patch.object(DiscreteAudioIO, "_init_sanity_check"),
+    ):
         io = DiscreteAudioIO(codec_choice="ESPnet", codec_hf_model_tag="mock/codec")
 
     io.ssl_model = None
@@ -113,9 +118,11 @@ def codec_only_io():
 @pytest.fixture
 def ssl_codec_io():
     """DiscreteAudioIO with both SSL and codec."""
-    with patch.object(DiscreteAudioIO, "_init_codec"), \
-         patch.object(DiscreteAudioIO, "_init_ssl"), \
-         patch.object(DiscreteAudioIO, "_init_sanity_check"):
+    with (
+        patch.object(DiscreteAudioIO, "_init_codec"),
+        patch.object(DiscreteAudioIO, "_init_ssl"),
+        patch.object(DiscreteAudioIO, "_init_sanity_check"),
+    ):
         io = DiscreteAudioIO(
             ssl_choice="ESPnet",
             ssl_hf_model_tag="espnet/xeus",
@@ -242,9 +249,11 @@ class TestDiscreteAudioIOStreamWeight:
         assert ssl_codec_io.get_stream_weight() == [1.0, 1.0, 1.0]
 
     def test_custom_weights(self):
-        with patch.object(DiscreteAudioIO, "_init_codec"), \
-             patch.object(DiscreteAudioIO, "_init_ssl"), \
-             patch.object(DiscreteAudioIO, "_init_sanity_check"):
+        with (
+            patch.object(DiscreteAudioIO, "_init_codec"),
+            patch.object(DiscreteAudioIO, "_init_ssl"),
+            patch.object(DiscreteAudioIO, "_init_sanity_check"),
+        ):
             io = DiscreteAudioIO(
                 ssl_choice="ESPnet",
                 ssl_hf_model_tag="espnet/xeus",
@@ -269,9 +278,11 @@ class TestDiscreteAudioIOStreamWeight:
         assert io.get_stream_weight() == [0.5, 1.0, 0.8]
 
     def test_wrong_weight_count_raises(self):
-        with patch.object(DiscreteAudioIO, "_init_codec"), \
-             patch.object(DiscreteAudioIO, "_init_ssl"), \
-             patch.object(DiscreteAudioIO, "_init_sanity_check"):
+        with (
+            patch.object(DiscreteAudioIO, "_init_codec"),
+            patch.object(DiscreteAudioIO, "_init_ssl"),
+            patch.object(DiscreteAudioIO, "_init_sanity_check"),
+        ):
             io = DiscreteAudioIO(
                 ssl_choice="ESPnet",
                 ssl_hf_model_tag="espnet/xeus",
@@ -294,9 +305,11 @@ class TestDiscreteAudioIOStreamWeight:
             io._init_sanity_check()
 
     def test_negative_weight_raises(self):
-        with patch.object(DiscreteAudioIO, "_init_codec"), \
-             patch.object(DiscreteAudioIO, "_init_ssl"), \
-             patch.object(DiscreteAudioIO, "_init_sanity_check"):
+        with (
+            patch.object(DiscreteAudioIO, "_init_codec"),
+            patch.object(DiscreteAudioIO, "_init_ssl"),
+            patch.object(DiscreteAudioIO, "_init_sanity_check"),
+        ):
             io = DiscreteAudioIO(
                 ssl_choice="ESPnet",
                 ssl_hf_model_tag="espnet/xeus",
@@ -324,9 +337,11 @@ class TestDiscreteAudioIOStreamWeight:
 # ---------------------------------------------------------------------------
 class TestDiscreteAudioIOSanityCheck:
     def test_mismatched_sample_rate_raises(self):
-        with patch.object(DiscreteAudioIO, "_init_codec"), \
-             patch.object(DiscreteAudioIO, "_init_ssl"), \
-             patch.object(DiscreteAudioIO, "_init_sanity_check"):
+        with (
+            patch.object(DiscreteAudioIO, "_init_codec"),
+            patch.object(DiscreteAudioIO, "_init_ssl"),
+            patch.object(DiscreteAudioIO, "_init_sanity_check"),
+        ):
             io = DiscreteAudioIO(
                 ssl_choice="ESPnet",
                 ssl_hf_model_tag="espnet/xeus",
@@ -350,9 +365,11 @@ class TestDiscreteAudioIOSanityCheck:
             io._init_sanity_check()
 
     def test_mismatched_frame_shift_raises(self):
-        with patch.object(DiscreteAudioIO, "_init_codec"), \
-             patch.object(DiscreteAudioIO, "_init_ssl"), \
-             patch.object(DiscreteAudioIO, "_init_sanity_check"):
+        with (
+            patch.object(DiscreteAudioIO, "_init_codec"),
+            patch.object(DiscreteAudioIO, "_init_ssl"),
+            patch.object(DiscreteAudioIO, "_init_sanity_check"),
+        ):
             io = DiscreteAudioIO(
                 ssl_choice="ESPnet",
                 ssl_hf_model_tag="espnet/xeus",

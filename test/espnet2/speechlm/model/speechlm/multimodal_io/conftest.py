@@ -19,9 +19,7 @@ def pytest_configure():
     # ---- torchaudio stub (must come before any audio.py import) ----
     if "torchaudio" not in sys.modules:
         torchaudio = types.ModuleType("torchaudio")
-        torchaudio.__spec__ = importlib.machinery.ModuleSpec(
-            "torchaudio", loader=None
-        )
+        torchaudio.__spec__ = importlib.machinery.ModuleSpec("torchaudio", loader=None)
 
         functional = types.ModuleType("torchaudio.functional")
         functional.__spec__ = importlib.machinery.ModuleSpec(
@@ -40,9 +38,7 @@ def pytest_configure():
     # ---- espnet_model_zoo stub ----
     if "espnet_model_zoo" not in sys.modules:
         emz = types.ModuleType("espnet_model_zoo")
-        emz.__spec__ = importlib.machinery.ModuleSpec(
-            "espnet_model_zoo", loader=None
-        )
+        emz.__spec__ = importlib.machinery.ModuleSpec("espnet_model_zoo", loader=None)
         dl_mod = types.ModuleType("espnet_model_zoo.downloader")
         dl_mod.__spec__ = importlib.machinery.ModuleSpec(
             "espnet_model_zoo.downloader", loader=None
