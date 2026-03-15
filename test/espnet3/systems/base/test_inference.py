@@ -379,7 +379,9 @@ def test_inference_rejects_cuda_tensor_artifact(tmp_path, monkeypatch):
             "runner": {"_target_": f"{__name__}.DummyRunner"},
         }
     )
-    DummyRunner.results = [{"utt_id": "utt1", "posterior": torch.tensor([1.0], device="cuda")}]
+    DummyRunner.results = [
+        {"utt_id": "utt1", "posterior": torch.tensor([1.0], device="cuda")}
+    ]
 
     monkeypatch.setattr(inference_mod, "set_parallel", lambda arg: None)
 

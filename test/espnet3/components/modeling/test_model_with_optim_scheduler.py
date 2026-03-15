@@ -1,5 +1,5 @@
-import pytest
 import numpy as np
+import pytest
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
@@ -204,7 +204,10 @@ class DummyMultiModel(nn.Module):
         if self.include_aux:
             losses["aux"] = self.aux(x).sum()
         stats = {f"{name}_loss": loss.detach() for name, loss in losses.items()}
-        steps = [OptimizationStep(loss=losses[name], name=name) for name in self.returned_names]
+        steps = [
+            OptimizationStep(loss=losses[name], name=name)
+            for name in self.returned_names
+        ]
         if len(steps) == 1:
             return steps[0], stats, None
         return steps, stats, None
@@ -273,7 +276,10 @@ def test_single_optim_and_scheduler():
 
 
 def test_single_reduce_on_plateau_monitor():
-    """Verify single-path monitored schedulers forward `scheduler_monitor` to Lightning."""
+    """Verify single-path monitored schedulers forward `scheduler_monitor`.
+
+    The configured monitor should be passed through to Lightning.
+    """
     config = make_base_config()
     config.update(
         {
@@ -327,7 +333,10 @@ def test_multiple_named_optimizers_and_schedulers():
 
 
 def test_doc_example_multi_optimizer_scheduler_config_is_supported():
-    """Support the documented generator/discriminator optimizer and scheduler example."""
+    """Support the documented generator/discriminator optimizer example.
+
+    This also checks the paired scheduler configuration.
+    """
     config = OmegaConf.create(
         {
             **make_base_config(),
@@ -496,7 +505,9 @@ def test_optimizer_and_scheduler_names_must_match():
         "interval": "step",
     }
     module = ESPnetLightningModule(DummyMultiModel(["generator"]), config)
-    with pytest.raises(AssertionError, match="Optimizer and scheduler names must match"):
+    with pytest.raises(
+        AssertionError, match="Optimizer and scheduler names must match"
+    ):
         module.configure_optimizers()
 
 
@@ -511,7 +522,10 @@ def test_optimizer_params_must_cover_trainable_parameters():
 
 
 def test_optimizer_params_must_not_overlap():
-    """Reject multi-optimizer configs that assign one parameter to multiple optimizers."""
+    """Reject multi-optimizer configs with overlapping parameter assignments.
+
+    One trainable parameter must not belong to multiple optimizers.
+    """
     config = make_multi_config()
     config.optimizers.generator.params = "generator"
     config.optimizers.discriminator.params = "generator"
@@ -524,6 +538,7 @@ def test_optimizer_params_must_not_overlap():
 
 def test_single_optimizer_rejects_optimization_step():
     """Keep the single optimizer path on the legacy plain-tensor loss contract."""
+
     class BadSingleModel(nn.Module):
         def __init__(self):
             super().__init__()
@@ -531,7 +546,11 @@ def test_single_optimizer_rejects_optimization_step():
 
         def forward(self, x, **kwargs):
             loss = self.linear(x).sum()
-            return OptimizationStep(loss=loss, name="main"), {"loss": loss.detach()}, None
+            return (
+                OptimizationStep(loss=loss, name="main"),
+                {"loss": loss.detach()},
+                None,
+            )
 
     module = ESPnetLightningModule(BadSingleModel(), make_single_config())
     with pytest.raises(AssertionError, match="return it directly instead of wrapping"):
@@ -539,7 +558,10 @@ def test_single_optimizer_rejects_optimization_step():
 
 
 def test_multiple_optimizers_require_optimization_step():
-    """Require `OptimizationStep` returns when named multiple optimizers are configured."""
+    """Require `OptimizationStep` returns for named multiple optimizers.
+
+    Plain tensor loss is invalid once multi-optimizer routing is enabled.
+    """
     module = ESPnetLightningModule(DummyTensorLossMultiModel(), make_multi_config())
     module.configure_optimizers()
     with pytest.raises(AssertionError, match="must be `OptimizationStep`"):
@@ -555,14 +577,18 @@ def test_multiple_optimizer_training_step_updates_only_named_optimizer():
     )
 
     before_g = scheduler_map["generator"].last_epoch
-    before_d = optimizer_map["discriminator"].param_groups[0]["params"][0].detach().clone()
+    before_d = (
+        optimizer_map["discriminator"].param_groups[0]["params"][0].detach().clone()
+    )
     module.training_step(make_train_batch(module), 0)
 
     assert "train/generator/loss" in logged
     assert "train/generator/update_step" in logged
     assert "train/discriminator/update_step" not in logged
     assert scheduler_map["generator"].last_epoch == before_g + 1
-    after_d = optimizer_map["discriminator"].param_groups[0]["params"][0].detach().clone()
+    after_d = (
+        optimizer_map["discriminator"].param_groups[0]["params"][0].detach().clone()
+    )
     assert torch.equal(before_d, after_d)
 
 
@@ -612,7 +638,10 @@ def test_step_scheduler_advances_only_on_optimizer_update():
 
 
 def test_clip_gradients_uses_optimizer_spec():
-    """Use per-optimizer clipping settings from `OptimizerSpec` in multi-path training."""
+    """Use per-optimizer clipping settings from `OptimizerSpec`.
+
+    The multi-optimizer path should not rely on trainer-level clipping.
+    """
     module = ESPnetLightningModule(
         DummyMultiModel(["generator"]), make_multi_config(gradient_clip_val=0.5)
     )
@@ -675,7 +704,10 @@ def test_checkpoint_restores_runtime_state():
 
 
 def test_multi_optimizer_fit_runs_with_real_trainer(tmp_path):
-    """Run one real `ESPnet3LightningTrainer.fit()` iteration for multi-optimizer training."""
+    """Run one real `ESPnet3LightningTrainer.fit()` iteration.
+
+    This covers the multi-optimizer path with the real trainer loop.
+    """
     model = ESPnetLightningModule(
         DummyMultiModel(["generator"]), make_multi_step_scheduler_config()
     )

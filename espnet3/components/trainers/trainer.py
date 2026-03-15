@@ -176,7 +176,7 @@ class ESPnet3LightningTrainer:
             )
 
     def _validate_multi_optimizer_trainer_config(self) -> None:
-        """Reject trainer-level options that conflict with manual multi-optimizer logic."""
+        """Reject trainer options that conflict with manual multi-optimizer logic."""
         if getattr(self.model.config, "optimizers", None) is None:
             return
 

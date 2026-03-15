@@ -1,11 +1,10 @@
 from pathlib import Path
 
-import pytest
-
 from espnet3.utils.config_utils import (
     load_and_merge_config,
     load_default_config,
 )
+
 
 def test_load_default_config_train_contains_expected_targets() -> None:
     cfg = load_default_config("training.yaml", "egs3.TEMPLATE.asr")

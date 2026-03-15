@@ -376,11 +376,7 @@ def _rewrite_relative_resolver_paths(value: str, base_path: Path) -> str:
 def _split_optional_quotes(raw_path: str) -> tuple[str, str]:
     # Resolver paths may be quoted when the path contains spaces. Preserve the
     # quote style so the rewritten resolver expression remains parseable.
-    if (
-        len(raw_path) >= 2
-        and raw_path[0] == raw_path[-1]
-        and raw_path[0] in ("'", '"')
-    ):
+    if len(raw_path) >= 2 and raw_path[0] == raw_path[-1] and raw_path[0] in ("'", '"'):
         return raw_path[0], raw_path[1:-1].strip()
     return "", raw_path
 

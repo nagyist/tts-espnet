@@ -58,7 +58,7 @@ def measure(metrics_config: DictConfig):
               test-clean/
               test-other/
 
-        then ``measure()`` scores both ``test-clean`` and ``test-other`` 
+        then ``measure()`` scores both ``test-clean`` and ``test-other``
         when ``metrics_config.dataset.test`` is omitted.
 
     Args:
