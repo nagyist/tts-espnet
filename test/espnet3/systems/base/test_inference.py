@@ -1,6 +1,9 @@
 from pathlib import Path
 
+import numpy as np
 import pytest
+import soundfile as sf
+import torch
 from omegaconf import OmegaConf
 
 import espnet3.systems.base.inference as inference_mod
@@ -10,6 +13,13 @@ from espnet3.systems.base.inference_runner import InferenceRunner
 
 def dummy_output_fn(*, data, model_output, idx):
     return {"idx": idx, "hyp": "h", "ref": "r"}
+
+
+def custom_npy_writer(*, value, output_path: Path, scale: float = 1.0) -> Path:
+    target = output_path.with_suffix(".custom.npy")
+    target.parent.mkdir(parents=True, exist_ok=True)
+    np.save(target, np.asarray(value) * scale)
+    return target
 
 
 class DummyProvider(InferenceProvider):
@@ -254,6 +264,149 @@ def test_inference_with_explicit_output_keys_filters_scp_outputs(tmp_path, monke
     base = tmp_path / "infer" / "test_a"
     assert (base / "hyp.scp").exists()
     assert not (base / "ref.scp").exists()
+
+
+def test_inference_writes_artifacts_from_config(tmp_path, monkeypatch):
+    cfg = OmegaConf.create(
+        {
+            "parallel": {"env": "local"},
+            "inference_dir": str(tmp_path / "infer"),
+            "dataset": {"test": [{"name": "test_a"}]},
+            "input_key": "speech",
+            "mock_dataset_length": 1,
+            "provider": {"_target_": f"{__name__}.DummyProvider"},
+            "runner": {"_target_": f"{__name__}.DummyRunner"},
+            "output_artifacts": {
+                "audio": {"type": "wav", "sample_rate": 16000},
+                "posterior": {"type": "npy"},
+            },
+        }
+    )
+    DummyRunner.results = [
+        {
+            "utt_id": "utt1",
+            "audio": np.array([0.0, 0.1, -0.1], dtype=np.float32),
+            "posterior": torch.tensor([1.0, 2.0]),
+        }
+    ]
+
+    monkeypatch.setattr(inference_mod, "set_parallel", lambda arg: None)
+
+    inference_mod.infer(cfg)
+
+    base = tmp_path / "infer" / "test_a"
+    audio_path = Path(_read_scp(base / "audio.scp")[0].split(maxsplit=1)[1])
+    posterior_path = Path(_read_scp(base / "posterior.scp")[0].split(maxsplit=1)[1])
+    _, rate = sf.read(audio_path, dtype="float32")
+    assert rate == 16000
+    assert audio_path.suffix == ".wav"
+    assert posterior_path.suffix == ".npy"
+    assert np.array_equal(np.load(posterior_path), np.array([1.0, 2.0]))
+
+
+def test_inference_writes_dict_artifacts_as_json(tmp_path, monkeypatch):
+    cfg = OmegaConf.create(
+        {
+            "parallel": {"env": "local"},
+            "inference_dir": str(tmp_path / "infer"),
+            "dataset": {"test": [{"name": "test_a"}]},
+            "input_key": "speech",
+            "mock_dataset_length": 1,
+            "provider": {"_target_": f"{__name__}.DummyProvider"},
+            "runner": {"_target_": f"{__name__}.DummyRunner"},
+        }
+    )
+    DummyRunner.results = [
+        {
+            "utt_id": "utt1",
+            "meta": {"frames": [1, 2, 3], "tag": "ok"},
+        }
+    ]
+
+    monkeypatch.setattr(inference_mod, "set_parallel", lambda arg: None)
+
+    inference_mod.infer(cfg)
+
+    base = tmp_path / "infer" / "test_a"
+    path = Path(_read_scp(base / "meta.scp")[0].split(maxsplit=1)[1])
+    assert path.suffix == ".json"
+    assert path.read_text(encoding="utf-8").strip().startswith("{")
+
+
+def test_inference_writes_artifacts_with_custom_writer(tmp_path, monkeypatch):
+    cfg = OmegaConf.create(
+        {
+            "parallel": {"env": "local"},
+            "inference_dir": str(tmp_path / "infer"),
+            "dataset": {"test": [{"name": "test_a"}]},
+            "input_key": "speech",
+            "mock_dataset_length": 1,
+            "provider": {"_target_": f"{__name__}.DummyProvider"},
+            "runner": {"_target_": f"{__name__}.DummyRunner"},
+            "output_artifacts": {
+                "posterior": {
+                    "writer": {
+                        "_target_": f"{__name__}.custom_npy_writer",
+                        "scale": 2.0,
+                    }
+                }
+            },
+        }
+    )
+    DummyRunner.results = [{"utt_id": "utt1", "posterior": np.array([1.0, 2.0])}]
+
+    monkeypatch.setattr(inference_mod, "set_parallel", lambda arg: None)
+
+    inference_mod.infer(cfg)
+
+    base = tmp_path / "infer" / "test_a"
+    path = Path(_read_scp(base / "posterior.scp")[0].split(maxsplit=1)[1])
+    assert path.suffixes[-2:] == [".custom", ".npy"]
+    assert np.array_equal(np.load(path), np.array([2.0, 4.0]))
+
+
+def test_inference_rejects_cuda_tensor_artifact(tmp_path, monkeypatch):
+    if not torch.cuda.is_available():
+        pytest.skip("CUDA is not available in test env.")
+    cfg = OmegaConf.create(
+        {
+            "parallel": {"env": "local"},
+            "inference_dir": str(tmp_path / "infer"),
+            "dataset": {"test": [{"name": "test_a"}]},
+            "input_key": "speech",
+            "mock_dataset_length": 1,
+            "provider": {"_target_": f"{__name__}.DummyProvider"},
+            "runner": {"_target_": f"{__name__}.DummyRunner"},
+        }
+    )
+    DummyRunner.results = [
+        {"utt_id": "utt1", "posterior": torch.tensor([1.0], device="cuda")}
+    ]
+
+    monkeypatch.setattr(inference_mod, "set_parallel", lambda arg: None)
+
+    with pytest.raises(ValueError, match="Move the tensor to CPU"):
+        inference_mod.infer(cfg)
+
+
+def test_inference_rejects_top_level_list_outputs(tmp_path, monkeypatch):
+    cfg = OmegaConf.create(
+        {
+            "parallel": {"env": "local"},
+            "inference_dir": str(tmp_path / "infer"),
+            "dataset": {"test": [{"name": "test_a"}]},
+            "input_key": "speech",
+            "mock_dataset_length": 1,
+            "provider": {"_target_": f"{__name__}.DummyProvider"},
+            "runner": {"_target_": f"{__name__}.DummyRunner"},
+        }
+    )
+    DummyRunner.results = [{"utt_id": "utt1", "audio": [1, 2, 3]}]
+
+    monkeypatch.setattr(inference_mod, "set_parallel", lambda arg: None)
+
+    with pytest.raises(TypeError, match="Top-level list outputs are not supported"):
+        inference_mod.infer(cfg)
 
 
 def test_inference_without_output_fn_requires_utterance_id(tmp_path, monkeypatch):
