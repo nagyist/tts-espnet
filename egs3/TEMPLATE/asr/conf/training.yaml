@@ -95,7 +95,6 @@ model:
 ##########################################################
 #            OPTIMIZER & SCHEDULER SETTING               #
 ##########################################################
-# Single optimizer path:
 optimizer:
   _target_: torch.optim.Adam
   lr: 0.002
@@ -104,52 +103,6 @@ optimizer:
 scheduler:
   _target_: espnet2.schedulers.warmup_lr.WarmupLR
   warmup_steps: 15000
-
-# Used only in the single optimizer path.
-scheduler_interval: step   # `step` or `epoch`
-scheduler_monitor:         # e.g. `valid/loss` for monitored epoch schedulers
-
-# Multiple-loss / multiple-optimizer path:
-# optimizers:
-#   generator:
-#     optimizer:
-#       _target_: torch.optim.Adam
-#       lr: 0.0002                 # optimizer config for `generator`
-#     params: generator            # substring used to select parameters
-#     accum_grad_steps: 1          # number of backward passes before optimizer.step()
-#     step_every_n_iters: 1        # only step on every N-th training iteration
-#     gradient_clip_val: 1.0       # per-optimizer gradient clipping value
-#     gradient_clip_algorithm: norm  # `norm` or `value`
-#
-#   discriminator:
-#     optimizer:
-#       _target_: torch.optim.Adam
-#       lr: 0.0002                 # optimizer config for `discriminator`
-#     params: discriminator        # substring used to select parameters
-#     accum_grad_steps: 1          # number of backward passes before optimizer.step()
-#     step_every_n_iters: 1        # only step on every N-th training iteration
-#
-# schedulers:
-#   generator:
-#     scheduler:
-#       _target_: torch.optim.lr_scheduler.LinearLR
-#       start_factor: 1.0          # scheduler-specific argument
-#       end_factor: 0.5            # scheduler-specific argument
-#       total_iters: 1000          # scheduler-specific argument
-#     interval: step               # `step` schedulers run after optimizer updates
-#
-#   discriminator:
-#     scheduler:
-#       _target_: torch.optim.lr_scheduler.ReduceLROnPlateau
-#       patience: 2                # scheduler-specific argument
-#       factor: 0.5                # scheduler-specific argument
-#     interval: epoch              # `epoch` schedulers run in `on_train_epoch_end()`
-#     monitor: valid/discriminator/loss  # required for monitored epoch schedulers
-#
-# Note:
-# - In the multiple-optimizer path, do not use trainer-level
-#   `trainer.gradient_clip_val` or `trainer.gradient_clip_algorithm`.
-#   Configure clipping per optimizer as shown above.
 
 ##########################################################
 #                OTHER TRAINING SETTING                  #
