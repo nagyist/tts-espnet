@@ -131,7 +131,6 @@ best_model_criterion:
 # Keep batches tiny so the config stays lightweight in CI.
 dataloader:
   train:
-    multiple_iterator: false
     num_shards: 1
     iter_factory:
       batches:

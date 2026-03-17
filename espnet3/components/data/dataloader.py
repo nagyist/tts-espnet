@@ -219,7 +219,6 @@ class DataLoaderBuilder:
 
         # Remove default config for espnet's data loader
         config.pop("iter_factory")
-
         loader = torch.utils.data.DataLoader(
             dataset,
             sampler=sampler,

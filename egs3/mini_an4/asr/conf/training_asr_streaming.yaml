@@ -122,7 +122,6 @@ best_model_criterion:
 # Unsorted mini-batches keep the streaming example simple.
 dataloader:
   train:
-    multiple_iterator: false
     num_shards: 1
     iter_factory:
       batches:

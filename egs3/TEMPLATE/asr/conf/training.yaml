@@ -188,7 +188,6 @@ dataloader:
     int_pad_value: -1
   # Training dataloader / iterator settings.
   train:
-    multiple_iterator: false
     num_shards: 1
     iter_factory:
       _target_: espnet2.iterators.sequence_iter_factory.SequenceIterFactory
@@ -205,7 +204,6 @@ dataloader:
 
   # Validation dataloader / iterator settings.
   valid:
-    multiple_iterator: false
     num_shards: 1
     iter_factory:
       _target_: espnet2.iterators.sequence_iter_factory.SequenceIterFactory
