@@ -274,6 +274,7 @@ class CombinedDataset:
     # ------------------------------------------------------------------
     def _initialize_index_mode(self):
         """Determine whether datasets should be accessed via string keys."""
+
         def supports_integer_index(dataset):
             try:
                 dataset[0]
@@ -351,7 +352,11 @@ class CombinedDataset:
             else:
                 raise IndexError("Index out of range in CombinedDataset")
 
-            ds_idx = idx if dataset_idx == 0 else idx - self.cumulative_lengths[dataset_idx - 1]
+            ds_idx = (
+                idx
+                if dataset_idx == 0
+                else idx - self.cumulative_lengths[dataset_idx - 1]
+            )
             if self._dataset_supports_int[dataset_idx]:
                 uid = str(idx)
                 dataset_key = ds_idx
