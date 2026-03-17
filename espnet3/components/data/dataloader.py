@@ -119,8 +119,7 @@ class DataLoaderBuilder:
         shards_per_rank = num_shards // world_size
         start = (self.epoch * world_size) % num_shards
         shard_indices = [
-            (start + rank + world_size * i) % num_shards
-            for i in range(shards_per_rank)
+            (start + rank + world_size * i) % num_shards for i in range(shards_per_rank)
         ]
         # Use the first shard for the GPU and for the epoch.
         return dataset.shard(shard_indices[0])
