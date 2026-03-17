@@ -34,8 +34,7 @@ exp_tag: user_train
 optimizer:
   _target_: torch.optim.SGD
   lr: 0.1
-""".strip()
-        + "\n",
+""".strip() + "\n",
         encoding="utf-8",
     )
 
