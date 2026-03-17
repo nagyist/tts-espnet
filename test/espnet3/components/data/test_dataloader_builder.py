@@ -5,9 +5,22 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 from torch.utils.data import BatchSampler, Sampler
 
+from espnet3.components.data.data_organizer import DataOrganizer, do_nothing
 from espnet3.components.data.dataloader import DataLoaderBuilder
 from espnet3.components.data.dataset import ShardedDataset
-from espnet3.utils.config import load_config_with_defaults
+from espnet3.utils.config_utils import load_config_with_defaults
+
+# | Test Name                                         | Description                                                    | # noqa: E501
+# |--------------------------------------------------|----------------------------------------------------------------| # noqa: E501
+# | test_batch_sampler_only                          | Builds loader using batch_sampler without batch_size/shuffle   | # noqa: E501
+# | test_sampler_only                                | Builds loader using sampler                                    | # noqa: E501
+# | test_collate_fn_none                             | Uses default_collate when collate_fn is None                   | # noqa: E501
+# | test_common_collate_fn                           | Uses CommonCollateFn and checks audio/audio_lengths in batch   | # noqa: E501
+# | test_custom_collate_fn                           | Uses custom collate function and checks batch structure        | # noqa: E501
+# | test_sampler_and_batch_sampler_conflict          | Raises when sampler and batch_sampler are both set             | # noqa: E501
+# | test_iter_factory_from_default_yaml_with_organizer | Builds iter_factory from YAML and validates batch            | # noqa: E501
+# | test_iter_factory_with_collate_fn                | Prefers config-defined collate_fn over argument                | # noqa: E501
+# | test_iter_factory_drops_tail_batches_for_ddp     | Drops tail batches for DDP to match world size                 | # noqa: E501
 
 # ===============================================================
 # Test Case Summary for DataLoaderBuilder
@@ -141,6 +154,15 @@ class DummyMissingShardMethod:
         raise IndexError
 
 
+class DummyIterFactory:
+    def __init__(self, dataset, batches, **kwargs):
+        self.dataset = dataset
+        self.batches = list(batches)
+
+    def build_iter(self, epoch, shuffle=False):
+        return list(self.batches)
+
+
 # -------- Config mocks --------
 
 
@@ -237,7 +259,20 @@ def test_collate_fn_none():
 def test_common_collate_fn():
     from espnet2.train.collate_fn import CommonCollateFn
 
-    organizer = build_organizer(DUMMY_DATASET_TARGET)
+    config = {
+        "train": [
+            {
+                "name": "train_dummy",
+                "dataset": {"_target_": DUMMY_DATASET_TARGET},
+            }
+        ],
+    }
+    config = OmegaConf.create(config)
+    dataset = DataOrganizer(
+        train=instantiate(config["train"]),
+        valid=instantiate(config["train"]),
+        preprocessor=do_nothing,
+    )
     config = make_standard_dataloader_config()
     collate_fn = CommonCollateFn(int_pad_value=-1)
     organizer.train.use_espnet_collator = True
@@ -275,14 +310,27 @@ def test_sampler_and_batch_sampler_conflict():
     with pytest.raises(
         AssertionError, match="Cannot specify both sampler and batch_sampler"
     ):
-        _ = builder._build_standard_dataloader(config.dataloader.train)
+        _ = builder._build_standard_dataloader(config.dataloader.train, mode="train")
 
 
 # -------- IterFactory Mode & YAML-based Integration --------
 
 
 def test_iter_factory_from_default_yaml_with_organizer(tmp_path):
-    organizer = build_organizer(DUMMY_DATASET_TARGET)
+    config = {
+        "train": [
+            {
+                "name": "train_dummy",
+                "dataset": {"_target_": DUMMY_DATASET_TARGET},
+            }
+        ],
+    }
+    config = OmegaConf.create(config)
+    dataset = DataOrganizer(
+        train=instantiate(config["train"]),
+        valid=instantiate(config["train"]),
+        preprocessor=do_nothing,
+    )
     yaml_text = """
 dataloader:
   train:
@@ -321,7 +369,20 @@ dataloader:
 def test_iter_factory_with_collate_fn(tmp_path):
     # For this case the collate_fn in configuration is used.
     # The collate_fn in DataloaderBuilder.__init__ is only used in standard dataloader.
-    organizer = build_organizer(DUMMY_DATASET_TARGET)
+    config = {
+        "train": [
+            {
+                "name": "train_dummy",
+                "dataset": {"_target_": DUMMY_DATASET_TARGET},
+            }
+        ],
+    }
+    config = OmegaConf.create(config)
+    dataset = DataOrganizer(
+        train=instantiate(config["train"]),
+        valid=instantiate(config["train"]),
+        preprocessor=do_nothing,
+    )
     yaml_text = """
 dataloader:
   train:
@@ -358,16 +419,78 @@ dataloader:
     assert "audio_lengths" in batch[1]
 
 
+
 @pytest.mark.parametrize("flag", [True, False])
 def test_multiple_iterator_is_rejected(flag):
-    organizer = build_organizer(DUMMY_DATASET_TARGET)
+    dataset = DummyDataset()
     config = make_standard_dataloader_config()
     config.dataloader.train.multiple_iterator = flag
-    builder = build_builder(
-        organizer.train, config, collate_fn=None, num_device=1, epoch=0
-    )
+    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
     with pytest.raises(RuntimeError, match="multiple_iterator"):
         builder.build("train")
+
+
+@pytest.mark.parametrize("rank", [0, 1])
+def test_iter_factory_drops_tail_batches_for_ddp(monkeypatch, rank):
+    import espnet3.components.data.dataloader as dl
+
+    # 5 total batches -> for world_size=2, drop 1 tail batch, keep 4
+    def _fake_build_batch_sampler(**kwargs):
+        return [[0, 1], [2, 3], [4, 5], [6, 7], [8, 9]]
+
+    monkeypatch.setattr(dl, "build_batch_sampler", _fake_build_batch_sampler)
+    monkeypatch.setattr(dl.torch.distributed, "get_world_size", lambda: 2)
+    monkeypatch.setattr(dl.torch.distributed, "get_rank", lambda: rank)
+
+    config = OmegaConf.create(
+        {
+            "dataloader": {
+                "train": {
+                    "iter_factory": {
+                        "_target_": (
+                            "test.espnet3.components.data."
+                            "test_dataloader_builder.DummyIterFactory"
+                        ),
+                        "batches": {"dummy": 1},
+                    }
+                }
+            }
+        }
+    )
+
+    dataset = DummyDataset()
+    builder = DataLoaderBuilder(
+        dataset=dataset, config=config, collate_fn=None, num_device=2, epoch=0
+    )
+    iterator = builder.build("train")
+
+    assert len(iterator) == 2
+    assert all(batch[0] != 8 for batch in iterator)
+
+
+# --- Multiple Iterator Mode (Sharded Dataset) ---
+
+
+# Dummy sharded dataset that returns shard-specific samples
+class DummyShardedDataset(ShardedDataset):
+    def __init__(self, shard_id: int = None):
+        if shard_id is None:
+            self.samples = []
+        else:
+            self.samples = [
+                {"text": f"shard{shard_id}_sample0"},
+                {"text": f"shard{shard_id}_sample1"},
+            ]
+        self.shard_id = shard_id
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        return self.samples[idx]
+
+    def shard(self, idx: int):
+        return DummyShardedDataset(idx)
 
 
 def _collect_shard_ids(loader):

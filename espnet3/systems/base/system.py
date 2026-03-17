@@ -5,9 +5,9 @@ from pathlib import Path
 
 from omegaconf import DictConfig
 
-from espnet3.systems.base.inference import inference
-from espnet3.systems.base.measure import measure
-from espnet3.systems.base.train import collect_stats, train
+from espnet3.systems.base.inference import infer
+from espnet3.systems.base.metric import measure
+from espnet3.systems.base.training import collect_stats, train
 
 logger = logging.getLogger(__name__)
 
@@ -28,53 +28,125 @@ class BaseSystem:
       - caching
 
     All behavior is config-driven.
+
+    Args:
+        training_config (DictConfig | None): Training configuration.
+        inference_config (DictConfig | None): Inference configuration.
+        metrics_config (DictConfig | None): Measurement configuration.
+        stage_log_mapping (dict | None): Optional overrides for stage log path
+            resolution. Keys are stage names; values are dotted attribute
+            paths (e.g., ``"training_config.exp_dir"``) or lists/tuples of such
+            paths (first non-empty value wins).
+
+    Stage log mapping (base defaults):
+        | Stage          | Path reference                     |
+        |---             |---                                 |
+        | create_dataset | training_config.recipe_dir         |
+        | collect_stats  | training_config.stats_dir          |
+        | train          | training_config.exp_dir            |
+        | infer          | inference_config.inference_dir     |
+        | measure        | metrics_config.inference_dir       |
+        | pack_model     | training_config.exp_dir            |
+        | upload_model   | training_config.exp_dir            |
+
+    Any stage missing from the mapping (or resolving to ``None``) falls back
+    to the default log directory: ``training_config.exp_dir`` when available,
+    otherwise ``<cwd>/logs``.
+
+    Examples:
+        Override a subset of stage log paths:
+            ```python
+            system = BaseSystem(
+                training_config=train_cfg,
+                inference_config=infer_cfg,
+                metrics_config=measure_cfg,
+                stage_log_mapping={
+                    "infer": "training_config.exp_dir",
+                    "measure": "training_config.exp_dir",
+                },
+            )
+            ```
     """
 
     def __init__(
         self,
-        *,
-        train_config: DictConfig | None = None,
-        infer_config: DictConfig | None = None,
-        measure_config: DictConfig | None = None,
+        training_config: DictConfig | None = None,
+        inference_config: DictConfig | None = None,
+        metrics_config: DictConfig | None = None,
+        stage_log_mapping: dict | None = None,
     ) -> None:
         """Initialize the system with optional stage configs."""
-        self.train_config = train_config
-        self.infer_config = infer_config
-        self.metric_config = measure_config
-        if train_config is not None:
-            self.exp_dir = Path(train_config.exp_dir)
+        self.training_config = training_config
+        self.inference_config = inference_config
+        self.metrics_config = metrics_config
+
+        if training_config is not None:
+            self.exp_dir = Path(training_config.exp_dir)
             self.exp_dir.mkdir(parents=True, exist_ok=True)
         else:
             self.exp_dir = None
+
+        if self.exp_dir is not None:
+            default_dir = self.exp_dir
+        else:
+            default_dir = Path.cwd() / "logs"
+
+        base_mapping = {
+            "create_dataset": "training_config.recipe_dir",
+            "collect_stats": "training_config.stats_dir",
+            "train": "training_config.exp_dir",
+            "infer": "inference_config.inference_dir",
+            "measure": "metrics_config.inference_dir",
+            "pack_model": "training_config.exp_dir",
+            "upload_model": "training_config.exp_dir",
+        }
+        mapping = dict(base_mapping)
+        if stage_log_mapping:
+            # Explicitly override base mapping with caller-provided values.
+            mapping.update(stage_log_mapping)
+
+        self.stage_log_dirs = {"default": default_dir}
+        for stage, ref in mapping.items():
+            resolved = self._resolve_stage_log_ref(ref)
+            if resolved:
+                self.stage_log_dirs[stage] = Path(resolved)
+
         logger.info(
-            "Initialized %s with train_config=%s infer_config=%s "
-            "measure_config=%s exp_dir=%s",
+            "Initialized %s with training_config=%s inference_config=%s "
+            "metrics_config=%s exp_dir=%s",
             self.__class__.__name__,
-            train_config is not None,
-            infer_config is not None,
-            measure_config is not None,
+            training_config is not None,
+            inference_config is not None,
+            metrics_config is not None,
             self.exp_dir,
         )
 
-    def get_stage_log_dir(self, stage: str) -> Path:
-        """Return the default log directory for a stage.
+    def _resolve_stage_log_ref(
+        self, ref: str | list[str] | tuple[str, ...] | None
+    ) -> str | None:
+        """Resolve stage log mapping references to concrete values.
 
-        BaseSystem treats all stages uniformly and writes logs into:
-          - ``train_config.exp_dir`` when available, or
-          - ``<cwd>/logs`` as a fallback when no experiment directory is set.
-
-        Subclasses can override this method to route specific stages to
-        stage-aware artifact locations (e.g., dataset or decode outputs).
-
-        Args:
-            stage (str): Stage name being executed (unused by BaseSystem).
-
-        Returns:
-            Path: Directory where the stage log should be placed.
+        Supports dotted attribute paths like ``training_config.exp_dir`` and
+        fallbacks via list/tuple entries (first non-empty value wins).
         """
-        if self.exp_dir is not None:
-            return self.exp_dir
-        return Path.cwd() / "logs"
+        target = self
+        if isinstance(ref, (list, tuple)):
+            for item in ref:
+                resolved = self._resolve_stage_log_ref(item)
+                if resolved:
+                    return resolved
+            return None
+
+        if not isinstance(ref, str):
+            return None
+
+        root_name, *parts = ref.split(".")
+        current = getattr(target, root_name, None)
+        for part in parts:
+            if current is None:
+                return None
+            current = getattr(current, part, None)
+        return current
 
     @staticmethod
     def _reject_stage_args(stage: str, args, kwargs) -> None:
@@ -98,44 +170,44 @@ class BaseSystem:
         self._reject_stage_args("collect_stats", args, kwargs)
         logger.info(
             "Collecting stats | exp_dir=%s stats_dir=%s",
-            getattr(self.train_config, "exp_dir", None),
-            getattr(self.train_config, "stats_dir", None),
+            getattr(self.training_config, "exp_dir", None),
+            getattr(self.training_config, "stats_dir", None),
         )
-        return collect_stats(self.train_config)
+        return collect_stats(self.training_config)
 
     def train(self, *args, **kwargs):
         """Train the system model."""
         self._reject_stage_args("train", args, kwargs)
         model_target = None
-        if self.train_config is not None and hasattr(self.train_config, "model"):
-            model_cfg = self.train_config.model
-            if isinstance(model_cfg, DictConfig):
-                model_target = model_cfg.get("_target_")
+        if self.training_config is not None and hasattr(self.training_config, "model"):
+            model_config = self.training_config.model
+            if isinstance(model_config, DictConfig):
+                model_target = model_config.get("_target_")
         logger.info(
             "Training start | exp_dir=%s model=%s",
-            getattr(self.train_config, "exp_dir", None),
+            getattr(self.training_config, "exp_dir", None),
             model_target or "<unknown>",
         )
-        return train(self.train_config)
+        return train(self.training_config)
 
     def infer(self, *args, **kwargs):
         """Run inference on the configured datasets."""
         self._reject_stage_args("infer", args, kwargs)
         logger.info(
-            "Inference start | infer_dir=%s",
-            getattr(self.infer_config, "infer_dir", None),
+            "Inference start | inference_dir=%s",
+            getattr(self.inference_config, "inference_dir", None),
         )
-        return inference(self.infer_config)
+        return infer(self.inference_config)
 
     def measure(self, *args, **kwargs):
         """Compute evaluation metrics from hypothesis/reference outputs."""
         self._reject_stage_args("measure", args, kwargs)
         logger.info(
-            "Measurement start | metric_config=%s",
-            self.metric_config is not None,
+            "Metrics start | metrics_config=%s",
+            self.metrics_config is not None,
         )
-        result = measure(self.metric_config)
-        logger.info("Measurement results: %s", result)
+        result = measure(self.metrics_config)
+        logger.info("results: %s", result)
         return result
 
     def publish(self, *args, **kwargs):

@@ -4,10 +4,12 @@ import pytest
 from omegaconf import OmegaConf
 from yaml.parser import ParserError
 
-from espnet3.utils.config import (
+from espnet3.utils.config_utils import (
     _build_config_path,
     _ensure_target_convert_all,
+    load_and_merge_config,
     load_config_with_defaults,
+    load_default_config,
     load_line,
     load_yaml,
 )
@@ -248,6 +250,47 @@ foo: bar
     assert "defaults" not in cfg
 
 
+def test_load_yaml_relative_path_survives_merge(write_yaml):
+    write_yaml(
+        "conf/training.yaml",
+        """
+exp_dir: ./exp/train_debug
+dataset_dir: ./data/mini_an4
+""",
+    )
+    path = write_yaml(
+        "conf/inference.yaml",
+        """
+exp_dir: ${load_yaml:training.yaml,exp_dir}
+dataset_dir: ${load_yaml:training.yaml,dataset_dir}
+""",
+    )
+    cfg = load_config_with_defaults(str(path))
+    merged = OmegaConf.merge(OmegaConf.create({"provider": {"name": "dummy"}}), cfg)
+
+    assert merged.exp_dir == "./exp/train_debug"
+    assert merged.dataset_dir == "./data/mini_an4"
+
+
+def test_load_yaml_quoted_relative_path_with_spaces(write_yaml):
+    write_yaml(
+        "conf dir/training config.yaml",
+        """
+exp_tag: train_debug
+""",
+    )
+    path = write_yaml(
+        "conf dir/inference.yaml",
+        """
+exp_tag: ${load_yaml:"training config.yaml",exp_tag}
+""",
+    )
+
+    cfg = load_config_with_defaults(str(path))
+
+    assert cfg.exp_tag == "train_debug"
+
+
 def test_missing_file_raises(tmp_path):
     """Test that loading a config with a missing file in `defaults`
 
@@ -314,6 +357,81 @@ def test_load_yaml_missing_key_raises(write_yaml):
     path = write_yaml("config.yaml", "foo: 1\n")
     with pytest.raises(KeyError):
         load_yaml(str(path), "missing.key")
+
+
+def test_load_default_config_train():
+    cfg = load_default_config("training.yaml", "egs3.TEMPLATE.asr")
+    assert "dataset" in cfg
+    assert "exp_dir" in cfg
+
+
+def test_load_and_merge_config_none():
+    assert load_and_merge_config(None, "metrics.yaml") is None
+
+
+def test_load_and_merge_config_resolves_user_reference_to_template_value(
+    write_yaml, monkeypatch
+):
+    template = write_yaml(
+        "template.yaml",
+        """
+exp_dir: ./exp/from_template
+inference_dir: ${exp_dir}/inference
+""",
+    )
+    user = write_yaml(
+        "user.yaml",
+        """
+custom_dir: ${exp_dir}/custom
+""",
+    )
+
+    monkeypatch.setattr(
+        "espnet3.utils.config_utils.load_default_config",
+        lambda _, __: load_config_with_defaults(str(template), resolve=False),
+    )
+
+    cfg = load_and_merge_config(
+        user,
+        "training.yaml",
+        default_package="dummy.package",
+    )
+
+    assert cfg.exp_dir == "./exp/from_template"
+    assert cfg.inference_dir == "./exp/from_template/inference"
+    assert cfg.custom_dir == "./exp/from_template/custom"
+
+
+def test_load_and_merge_config_resolves_template_reference_to_user_override(
+    write_yaml, monkeypatch
+):
+    template = write_yaml(
+        "template.yaml",
+        """
+exp_dir: ./exp/from_template
+custom_dir: ${exp_dir}/custom
+""",
+    )
+    user = write_yaml(
+        "user.yaml",
+        """
+exp_dir: ./exp/from_user
+""",
+    )
+
+    monkeypatch.setattr(
+        "espnet3.utils.config_utils.load_default_config",
+        lambda _, __: load_config_with_defaults(str(template), resolve=False),
+    )
+
+    cfg = load_and_merge_config(
+        user,
+        "training.yaml",
+        default_package="dummy.package",
+    )
+
+    assert cfg.exp_dir == "./exp/from_user"
+    assert cfg.custom_dir == "./exp/from_user/custom"
 
 
 def test_ensure_target_convert_all_nested():
