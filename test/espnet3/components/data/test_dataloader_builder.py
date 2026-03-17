@@ -270,7 +270,7 @@ def test_common_collate_fn():
         ],
     }
     config = OmegaConf.create(config)
-    dataset = DataOrganizer(
+    organizer = DataOrganizer(
         train=instantiate(config["train"]),
         valid=instantiate(config["train"]),
         preprocessor=do_nothing,
@@ -328,7 +328,7 @@ def test_iter_factory_from_default_yaml_with_organizer(tmp_path):
         ],
     }
     config = OmegaConf.create(config)
-    dataset = DataOrganizer(
+    organizer = DataOrganizer(
         train=instantiate(config["train"]),
         valid=instantiate(config["train"]),
         preprocessor=do_nothing,
@@ -380,7 +380,7 @@ def test_iter_factory_with_collate_fn(tmp_path):
         ],
     }
     config = OmegaConf.create(config)
-    dataset = DataOrganizer(
+    organizer = DataOrganizer(
         train=instantiate(config["train"]),
         valid=instantiate(config["train"]),
         preprocessor=do_nothing,
@@ -424,10 +424,12 @@ dataloader:
 
 @pytest.mark.parametrize("flag", [True, False])
 def test_multiple_iterator_is_rejected(flag):
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     config = make_standard_dataloader_config()
     config.dataloader.train.multiple_iterator = flag
-    builder = DataLoaderBuilder(dataset, config, collate_fn=None, num_device=1, epoch=0)
+    builder = DataLoaderBuilder(
+        organizer.train, config, collate_fn=None, num_device=1, epoch=0
+    )
     with pytest.raises(RuntimeError, match="multiple_iterator"):
         builder.build("train")
 
@@ -460,9 +462,9 @@ def test_iter_factory_drops_tail_batches_for_ddp(monkeypatch, rank):
         }
     )
 
-    dataset = DummyDataset()
+    organizer = build_organizer(DUMMY_DATASET_TARGET)
     builder = DataLoaderBuilder(
-        dataset=dataset, config=config, collate_fn=None, num_device=2, epoch=0
+        dataset=organizer.train, config=config, collate_fn=None, num_device=2, epoch=0
     )
     iterator = builder.build("train")
 
@@ -474,7 +476,7 @@ def test_iter_factory_drops_tail_batches_for_ddp(monkeypatch, rank):
 
 
 # Dummy sharded dataset that returns shard-specific samples
-class DummyShardedDataset(ShardedDataset):
+class DummyShardOnlyDataset(ShardedDataset):
     def __init__(self, shard_id: int = None):
         if shard_id is None:
             self.samples = []
@@ -492,7 +494,7 @@ class DummyShardedDataset(ShardedDataset):
         return self.samples[idx]
 
     def shard(self, idx: int):
-        return DummyShardedDataset(idx)
+        return DummyShardOnlyDataset(idx)
 
 
 def _collect_shard_ids(loader):
@@ -546,11 +548,14 @@ def test_sharded_dataset_multi_gpu_assignment(
     monkeypatch.setattr(torch.distributed, "get_world_size", _get_world_size)
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
-    dataset = DummyShardedDataset(num_shards=num_shards, world_shard_size=world_size)
+    organizer = build_organizer(
+        DUMMY_SHARDED_DATASET_TARGET,
+        dataset_kwargs={"num_shards": num_shards, "world_shard_size": world_size},
+    )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
     builder = DataLoaderBuilder(
-        dataset, config, collate_fn=None, num_device=world_size, epoch=0
+        organizer.train, config, collate_fn=None, num_device=world_size, epoch=0
     )
     loader = builder.build("train")
     shard_ids = _collect_shard_ids(loader)

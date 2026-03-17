@@ -202,10 +202,7 @@ class InferenceProvider(EnvironmentProvider, ABC):
         if isinstance(config, dict):
             config = OmegaConf.create(config)
 
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        if device == "cuda":
-            device_id = os.getenv("CUDA_VISIBLE_DEVICES", "0").split(",")[0].strip()
-            device = f"cuda:{device_id}"
+        device = InferenceProvider._resolve_device(config)
         logger.info(
             "Instantiating model %s on %s (CUDA_VISIBLE_DEVICES=%s, visible_gpus=%s)",
             getattr(config.model, "_target_", None),
