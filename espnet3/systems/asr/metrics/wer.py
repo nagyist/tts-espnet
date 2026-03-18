@@ -92,7 +92,10 @@ class WER(AbsMetric):
             The expected inputs are paths, not preloaded string lists:
 
             >>> metric(
-            ...     {"ref": Path("test-clean/ref.scp"), "hyp": Path("test-clean/hyp.scp")},
+            ...     {
+            ...         "ref": Path("test-other/ref.scp"),
+            ...         "hyp": Path("test-other/hyp.scp")
+            ...     },
             ...     "test-clean",
             ...     Path("infer"),
             ... )

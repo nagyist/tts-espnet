@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Dict, Iterator, List, Tuple
+from typing import Dict, Iterator, Tuple
 
 
 class AbsMetric(ABC):
@@ -128,7 +128,9 @@ class AbsMetric(ABC):
         try:
             for key in keys:
                 files[key] = open(data[key], "r", encoding="utf-8")
-            iterators = {key: self._iter_scp_file(file_obj) for key, file_obj in files.items()}
+            iterators = {
+                key: self._iter_scp_file(file_obj) for key, file_obj in files.items()
+            }
 
             while True:
                 rows = {}

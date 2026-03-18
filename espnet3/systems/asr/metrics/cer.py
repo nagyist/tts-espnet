@@ -90,7 +90,10 @@ class CER(AbsMetric):
 
         Example:
             >>> metric(
-            ...     {"ref": Path("test-other/ref.scp"), "hyp": Path("test-other/hyp.scp")},
+            ...     {
+            ...         "ref": Path("test-other/ref.scp"),
+            ...         "hyp": Path("test-other/hyp.scp")
+            ...     },
             ...     "test-other",
             ...     Path("infer"),
             ... )
