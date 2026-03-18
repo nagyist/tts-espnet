@@ -70,7 +70,7 @@ def load_scp_paths(
 
     Notes:
         - File contents are intentionally not loaded here.
-        - Consumers such as ``AbsMetric`` may stream the files or pass the
+        - Consumers such as ``BaseMetric`` may stream the files or pass the
           returned paths directly to external tools.
     """
     task_dir = inference_dir / test_name

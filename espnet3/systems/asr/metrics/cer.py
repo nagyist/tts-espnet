@@ -11,10 +11,10 @@ except ImportError:
     jiwer = None
 
 from espnet2.text.cleaner import TextCleaner
-from espnet3.components.metrics.abs_metric import AbsMetric
+from espnet3.components.metrics.base_metric import BaseMetric
 
 
-class CER(AbsMetric):
+class CER(BaseMetric):
     """Compute CER for a dataset.
 
     This metric expects hypothesis and reference strings and produces a

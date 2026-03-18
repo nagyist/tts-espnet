@@ -1,12 +1,12 @@
-"""Abstract metric interfaces for ESPnet3."""
+"""Base metric interfaces for ESPnet3."""
 
 from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Dict, Iterator, Tuple
 
 
-class AbsMetric(ABC):
-    """Abstract base class for metrics that consume inference output paths."""
+class BaseMetric(ABC):
+    """Base class for metrics that consume inference output paths."""
 
     @abstractmethod
     def __call__(

@@ -7,7 +7,7 @@ from pathlib import Path
 from hydra.utils import instantiate
 from omegaconf import DictConfig, OmegaConf
 
-from espnet3.components.metrics.abs_metric import AbsMetric
+from espnet3.components.metrics.base_metric import BaseMetric
 from espnet3.utils.logging_utils import log_component
 from espnet3.utils.scp_utils import get_class_path, load_scp_paths
 
@@ -77,8 +77,8 @@ def measure(metrics_config: DictConfig):
 
     for idx, metric_config in enumerate(metrics_config.metrics):
         metric = instantiate(metric_config.metric)
-        if not isinstance(metric, AbsMetric):
-            raise TypeError(f"{type(metric)} is not a valid AbsMetric instance")
+        if not isinstance(metric, BaseMetric):
+            raise TypeError(f"{type(metric)} is not a valid BaseMetric instance")
 
         log_component(
             logger,
