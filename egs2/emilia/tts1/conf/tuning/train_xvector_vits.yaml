@@ -15,14 +15,14 @@ tts_conf:
     # generator related
     generator_type: vits_generator
     generator_params:
-        hidden_channels: 192
+        hidden_channels: 256 # Default 192
         spks: -1
         spk_embed_dim: 192
         global_channels: 256
         segment_size: 32
-        text_encoder_attention_heads: 2
+        text_encoder_attention_heads: 4
         text_encoder_ffn_expand: 4
-        text_encoder_blocks: 6
+        text_encoder_blocks: 8
         text_encoder_positionwise_layer_type: "conv1d"
         text_encoder_positionwise_conv_kernel_size: 3
         text_encoder_positional_encoding_layer_type: "rel_pos"
@@ -40,7 +40,7 @@ tts_conf:
         use_conformer_conv_in_text_encoder: false
         text_encoder_conformer_kernel_size: -1
         decoder_kernel_size: 7
-        decoder_channels: 512
+        decoder_channels: 768
         decoder_upsample_scales: [8, 8, 2, 2]
         decoder_upsample_kernel_sizes: [16, 16, 4, 4]
         decoder_resblock_kernel_sizes: [3, 7, 11]
@@ -145,7 +145,7 @@ optim_conf:
     weight_decay: 0.0
 scheduler: exponentiallr
 scheduler_conf:
-    gamma: 0.999875
+    gamma: 0.999
 # optimizer setting for discriminator
 optim2: adamw
 optim2_conf:
@@ -155,22 +155,22 @@ optim2_conf:
     weight_decay: 0.0
 scheduler2: exponentiallr
 scheduler2_conf:
-    gamma: 0.999875
+    gamma: 0.999
 generator_first: false # whether to start updating generator first
 
 ##########################################################
 #                OTHER TRAINING SETTING                  #
 ##########################################################
 num_iters_per_epoch: 1000 # number of iterations per epoch
-max_epoch: 1000           # number of epochs
+max_epoch: 800           # number of epochs
 accum_grad: 1             # gradient accumulation
-batch_bins: 5000000       # batch bins (feats_type=raw)
+batch_bins: 8000000       # batch bins (feats_type=raw) Increased for larger model
 batch_type: numel         # how to make batch
-grad_clip: -1             # gradient clipping norm
+grad_clip: 1.0             # gradient clipping norm
 grad_noise: false         # whether to use gradient noise injection
 sort_in_batch: descending # how to sort data in making batch
 sort_batch: descending    # how to sort created batches
-num_workers: 4            # number of workers of data loader
+num_workers: 0            # number of workers of data loader
 use_amp: false            # whether to use pytorch amp
 log_interval: 50          # log interval in iterations
 keep_nbest_models: 10     # number of models to keep

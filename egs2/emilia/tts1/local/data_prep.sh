@@ -9,7 +9,13 @@ num_eval=5
 train_set="tr_no_dev"
 dev_set="dev"
 eval_set="eval"
-lang="EN"
+
+# Text filtering options
+filter_repetition=true
+max_char_repeat=10
+max_word_repeat=5
+max_repeat_ratio=0.5
+max_long_digits=15
 
 . utils/parse_options.sh || exit 1;
 
@@ -26,8 +32,11 @@ if [ $# != 2 ]; then
     echo "    --train_set: name of train set (default=${train_set})."
     echo "    --dev_set: name of dev set (default=${dev_set})."
     echo "    --eval_set: name of eval set (default=${eval_set})."
-    echo "    --nj: number of parallel jobs (default=${nj})."
-    echo "    --lang: language code of Emilia dataset (default=${lang})."
+    echo "    --filter_repetition: enable text filtering (default=${filter_repetition})."
+    echo "    --max_char_repeat: max consecutive char repetitions (default=${max_char_repeat})."
+    echo "    --max_word_repeat: max consecutive word repetitions (default=${max_word_repeat})."
+    echo "    --max_repeat_ratio: max ratio of repetitive chars (default=${max_repeat_ratio})."
+    echo "    --max_long_digits: max length of digit sequences (default=${max_long_digits})."
     exit 1
 fi
 
@@ -50,10 +59,14 @@ preprocess_emilia_subset() {
     scp="${subset_dir}/wav.scp"
     utt2spk="${subset_dir}/utt2spk"
     text="${subset_dir}/text"
+    filtered_log="${subset_dir}/filtered_utts.log"
 
-    rm -f "${scp}" "${utt2spk}" "${text}"
+    rm -f "${scp}" "${utt2spk}" "${text}" "${filtered_log}"
 
     echo "[${subset}] Processing..."
+
+    local total_count=0
+    local filtered_count=0
 
     # Iterate over mp3 files and use jq for JSON parsing
     while IFS= read -r wav; do
@@ -64,20 +77,50 @@ preprocess_emilia_subset() {
         speaker=$(jq -r '.speaker' "${json}")
         txt=$(jq -r '.text' "${json}")
 
+        total_count=$((total_count + 1))
+
+        # Apply text filtering if enabled
+        if [ "${filter_repetition}" = "true" ]; then
+            # Check if text should be filtered
+            if ! echo "${txt}" | python3 local/filter_text.py \
+                --max_char_repeat "${max_char_repeat}" \
+                --max_word_repeat "${max_word_repeat}" \
+                --max_repeat_ratio "${max_repeat_ratio}" \
+                --max_long_digits "${max_long_digits}"; then
+                # Text should be filtered out
+                filtered_count=$((filtered_count + 1))
+                echo "${id}: ${txt}" >> "${filtered_log}"
+                continue
+            fi
+        fi
+
         printf "%s %s\n" "$id" "$wav" >>"${scp}"
         printf "%s %s\n" "$id" "$speaker" >>"${utt2spk}"
         printf "%s %s\n" "$id" "$txt" >>"${text}"
     done < <(find "${db_emilia}/${subset}" -type f -name "*.mp3" | sort)
 
     utils/utt2spk_to_spk2utt.pl "${utt2spk}" >"${subset_dir}/spk2utt"
+    
+    # Log filtering statistics
+    local kept_count=$((total_count - filtered_count))
+    echo "[${subset}] Done. Total: ${total_count}, Kept: ${kept_count}, Filtered: ${filtered_count}"
+    if [ ${filtered_count} -gt 0 ]; then
+        echo "[${subset}] Filtered utterances logged to: ${filtered_log}"
+    fi
+    
     touch "${complete_flag}"
-    echo "[${subset}] Done."
 }
 export -f preprocess_emilia_subset
 
 # Preprocess emilia data
 echo "Preprocessing Emilia dataset..."
+if [ "${filter_repetition}" = "true" ]; then
+    echo "Text filtering enabled: max_char_repeat=${max_char_repeat}, max_word_repeat=${max_word_repeat}, max_repeat_ratio=${max_repeat_ratio}, max_long_digits=${max_long_digits}"
+fi
 emilia_subsets=($(find "${db_emilia}" -maxdepth 1 -name "${lang}-*" -exec basename {} \; | sort))
+
+# Export filtering variables for parallel jobs
+export filter_repetition max_char_repeat max_word_repeat max_repeat_ratio max_long_digits
 
 # Run in parallel (adjust nj to your CPU cores)
 parallel -j ${nj} preprocess_emilia_subset {} "${db_emilia}" ::: "${emilia_subsets[@]}"
