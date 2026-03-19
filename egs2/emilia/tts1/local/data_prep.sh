@@ -100,14 +100,14 @@ preprocess_emilia_subset() {
     done < <(find "${db_emilia}/${subset}" -type f -name "*.mp3" | sort)
 
     utils/utt2spk_to_spk2utt.pl "${utt2spk}" >"${subset_dir}/spk2utt"
-    
+
     # Log filtering statistics
     local kept_count=$((total_count - filtered_count))
     echo "[${subset}] Done. Total: ${total_count}, Kept: ${kept_count}, Filtered: ${filtered_count}"
     if [ ${filtered_count} -gt 0 ]; then
         echo "[${subset}] Filtered utterances logged to: ${filtered_log}"
     fi
-    
+
     touch "${complete_flag}"
 }
 export -f preprocess_emilia_subset
