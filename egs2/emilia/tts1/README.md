@@ -32,14 +32,14 @@ The Emilia dataset includes six languages: English (EN), Chinese (ZH), German (D
 The `--lang` argument must use one of the short codes listed above. When set, the dataset download and preprocessing steps will run for that language only. If not specified, the default language is English.
 
 # Results
-Epoch 375
+Epoch 700
 | Metric | Value |
 |:--|--:|
-| UTMOS | 2.49 |
-| MCD | 17.47 |
-| DNS (overall) | 3.09 |
-| DNS (P.808) | 3.59 |
-| Whisper WER | 0.36 |
+| UTMOS | 2.69 |
+| MCD | 17.65 |
+| DNS (overall) | 3.07 |
+| DNS (P.808) | 3.62 |
+| Whisper WER | 0.35 |
 | Whisper CER | 0.22 |
 | SingMOS | 3.71 |
-| Speaker similarity | 0.30 |
+| Speaker similarity | 0.35 |
