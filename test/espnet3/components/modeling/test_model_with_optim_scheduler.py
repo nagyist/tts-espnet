@@ -224,6 +224,17 @@ class DummyTensorLossMultiModel(nn.Module):
         return loss, {"loss": loss.detach()}, None
 
 
+class DummyAmbiguousSelectorModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.encoder = nn.Linear(2, 1)
+        self.decoder_encoder = nn.Linear(2, 1)
+
+    def forward(self, x, **kwargs):
+        loss = self.encoder(x).sum() + self.decoder_encoder(x).sum()
+        return loss, {"loss": loss.detach()}, None
+
+
 def make_train_batch(module):
     trainer = getattr(module, "_trainer", None)
     if trainer is None or not hasattr(trainer, "current_epoch"):
@@ -536,6 +547,64 @@ def test_optimizer_params_must_not_overlap():
         module.configure_optimizers()
 
 
+def test_optimizer_param_selector_matches_dot_delimited_boundaries():
+    """Match `params` on path boundaries instead of raw substring inclusion."""
+    config = make_base_config()
+    config.update(
+        {
+            "optimizers": {
+                "encoder": {
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.1},
+                    "params": "encoder",
+                },
+                "decoder_encoder": {
+                    "optimizer": {"_target_": "torch.optim.SGD", "lr": 0.1},
+                    "params": "decoder_encoder",
+                },
+            },
+            "schedulers": {
+                "encoder": {
+                    "scheduler": {
+                        "_target_": "torch.optim.lr_scheduler.StepLR",
+                        "step_size": 1,
+                    },
+                    "interval": "step",
+                },
+                "decoder_encoder": {
+                    "scheduler": {
+                        "_target_": "torch.optim.lr_scheduler.StepLR",
+                        "step_size": 1,
+                    },
+                    "interval": "step",
+                },
+            },
+        }
+    )
+    module = ESPnetLightningModule(
+        DummyAmbiguousSelectorModel(), OmegaConf.create(config)
+    )
+
+    optimizers, _ = module.configure_optimizers()
+    selected_names = []
+    for optimizer in optimizers:
+        selected_names.append(
+            sorted(
+                name
+                for name, param in module.named_parameters()
+                if any(
+                    param is p
+                    for group in optimizer.param_groups
+                    for p in group["params"]
+                )
+            )
+        )
+
+    assert selected_names == [
+        ["model.encoder.bias", "model.encoder.weight"],
+        ["model.decoder_encoder.bias", "model.decoder_encoder.weight"],
+    ]
+
+
 def test_single_optimizer_rejects_optimization_step():
     """Keep the single optimizer path on the legacy plain-tensor loss contract."""
 
@@ -679,6 +748,28 @@ def test_weight_none_does_not_pass_batch_size_to_logging():
     module.log_dict = capture
     module.training_step(make_train_batch(module), 0)
     assert "batch_size" not in kwargs_seen
+
+
+@pytest.mark.parametrize(
+    ("loss", "expected_skip", "initial_countdown", "expected_countdown"),
+    [
+        (torch.tensor(float("nan")), True, 0, 1),
+        (torch.tensor(float("inf")), True, 2, 3),
+        (torch.tensor(float("-inf")), True, 7, 8),
+        (torch.tensor(1.0), False, 9, 1),
+    ],
+)
+def test_check_nan_inf_loss_detects_nan_and_inf(
+    loss, expected_skip, initial_countdown, expected_countdown
+):
+    """Skip the batch only when at least one loss tensor is NaN or Inf."""
+    module = ESPnetLightningModule(DummySingleModel(), make_single_config())
+    module._trainer = type("DummyTrainer", (), {"current_epoch": 0})()
+    module._sync2skip = lambda flag_skip: bool(flag_skip.item())
+    module.nan_countdown = initial_countdown
+
+    assert module._check_nan_inf_loss([loss], batch_id=0) is expected_skip
+    assert module.nan_countdown == expected_countdown
 
 
 def test_checkpoint_restores_runtime_state():
