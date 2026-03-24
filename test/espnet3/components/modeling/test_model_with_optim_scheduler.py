@@ -591,7 +591,11 @@ def test_optimizer_param_selector_matches_dot_delimited_boundaries():
             sorted(
                 name
                 for name, param in module.named_parameters()
-                if any(param is p for group in optimizer.param_groups for p in group["params"])
+                if any(
+                    param is p
+                    for group in optimizer.param_groups
+                    for p in group["params"]
+                )
             )
         )
 
