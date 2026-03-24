@@ -43,6 +43,12 @@ def _collect_scp_lines(results, idx_key: str, hyp_keys, ref_keys):
 
         for field_key in (*ref_keys, *hyp_keys):
             value = result[field_key]
+            if isinstance(value, (list, tuple)):
+                raise TypeError(
+                    f"Top-level list outputs are not supported for '{field_key}'. "
+                    "Return a single value per field, or wrap structured content in a "
+                    "dict so it can be saved as JSON."
+                )
             scp_lines.setdefault(field_key, []).append(f"{idx_value} {value}")
 
     return scp_lines
