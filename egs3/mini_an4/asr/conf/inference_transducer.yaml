@@ -10,14 +10,11 @@
 ##########################################################
 exp_dir: ${load_yaml:training.yaml,exp_dir}
 inference_dir: ${exp_dir}/inference
-dataset_dir: ${load_yaml:training.yaml,dataset_dir}
 
 dataset:
   test:
-    - name: test
-      dataset:
-        _target_: src.dataset.MiniAN4Dataset
-        manifest_path: ${dataset_dir}/manifest/test.tsv
+    - dataset: mini_an4
+      split: test
 
 ##########################################################
 #                    MODEL AND OUTPUT                    #

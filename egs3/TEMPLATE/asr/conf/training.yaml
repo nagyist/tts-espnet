@@ -28,6 +28,17 @@ exp_tag:
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 stats_dir: ${recipe_dir}/exp/stats
 inference_dir: ${exp_dir}/inference
+
+# Directory where this recipe stores prepared manifests and any recipe-local
+# dataset artifacts.
+#
+# In simple recipes, prefer a fixed path under the recipe root, such as
+# `${recipe_dir}/dataset`, so users do not need to pass a dataset-specific
+# directory override at inference time.
+#
+# Keep this value as the single source of truth for dataset location. Training,
+# inference, and dataset creation should all reuse the same path instead of
+# redefining dataset names in multiple configs.
 dataset_dir: /path/to/your/dataset
 
 ##########################################################
@@ -36,6 +47,8 @@ dataset_dir: /path/to/your/dataset
 # Optional dataset creation hook for the `create_dataset` stage.
 # The function is resolved from `create_dataset.func` and called with the
 # remaining fields in this block as keyword arguments.
+# If your recipe builds manifests locally, write them under `${dataset_dir}` so
+# later stages can consume the same files without extra path overrides.
 create_dataset:
   func: src.creating_dataset.create_dataset
   dataset_dir: ${dataset_dir}

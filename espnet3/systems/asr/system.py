@@ -13,6 +13,7 @@ from typing import Iterable
 
 from espnet3.systems.asr.tokenizers.sentencepiece import train_sentencepiece
 from espnet3.systems.base.system import BaseSystem
+from espnet3.utils.dataset_module import ensure_dataset_reference_prepared
 
 logger = logging.getLogger(__name__)
 
@@ -77,19 +78,45 @@ class ASRSystem(BaseSystem):
         self._reject_stage_args("create_dataset", args, kwargs)
         logger.info("ASRSystem.create_dataset(): starting dataset creation process")
         start = time.perf_counter()
-        config = getattr(self.training_config, "create_dataset", None)
-        if config is None or not getattr(config, "func", None):
-            raise RuntimeError(
-                "training_config.create_dataset.func must be set to run create_dataset"
-            )
-        fn = load_function(config.func)
-        extra = {k: v for k, v in config.items() if k != "func"}
-        logger.info("Creating dataset with function %s", config.func)
-        result = fn(**extra)
+        dataset_config = getattr(self.training_config, "dataset", None)
+        recipe_dir = getattr(self.training_config, "recipe_dir", None)
+        prepared: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
+        result = None
+        if dataset_config is not None:
+            for split_name in ("train", "valid", "test"):
+                entries = getattr(dataset_config, split_name, None)
+                if entries is None:
+                    continue
+                for entry in entries:
+                    dataset_name = getattr(entry, "dataset", None)
+                    if not isinstance(dataset_name, str):
+                        continue
+                    extras = {}
+                    for key, value in entry.items():
+                        if key in {"dataset", "name", "split", "transform"}:
+                            continue
+                        extras[key] = str(value)
+                    marker = (dataset_name, tuple(sorted(extras.items())))
+                    if marker in prepared:
+                        continue
+                    logger.info("Ensuring dataset is prepared: %s", dataset_name)
+                    ensure_dataset_reference_prepared(entry, recipe_dir=recipe_dir)
+                    prepared.add(marker)
+
+        if len(prepared) == 0:
+            config = getattr(self.training_config, "create_dataset", None)
+            if config is None or not getattr(config, "func", None):
+                raise RuntimeError(
+                    "No dataset references or legacy create_dataset.func found in "
+                    "training config."
+                )
+            fn = load_function(config.func)
+            extra = {k: v for k, v in config.items() if k != "func"}
+            logger.info("Creating dataset with legacy function %s", config.func)
+            result = fn(**extra)
         logger.info(
-            "Dataset creation completed in %.2fs using %s",
+            "Dataset creation completed in %.2fs",
             time.perf_counter() - start,
-            config.func,
         )
         return result
 
@@ -100,14 +127,18 @@ class ASRSystem(BaseSystem):
         training before delegating to the base training routine.
 
         Raises:
-            RuntimeError: If ``training_config.dataset_dir`` is not set.
+            RuntimeError: If neither dataset references nor ``dataset_dir`` exist.
         """
         self._reject_stage_args("train", args, kwargs)
         logger.info("ASRSystem.train(): starting training process")
 
         dataset_dir = getattr(self.training_config, "dataset_dir", None)
-        if dataset_dir is None:
-            raise RuntimeError("training_config.dataset_dir must be set for training.")
+        dataset_config = getattr(self.training_config, "dataset", None)
+        if dataset_dir is None and dataset_config is None:
+            raise RuntimeError(
+                "training_config.dataset or training_config.dataset_dir must be set "
+                "for training."
+            )
 
         # Train tokenizer if not trained previously
         if not self._has_tokenizer():

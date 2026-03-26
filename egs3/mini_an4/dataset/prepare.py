@@ -1,8 +1,7 @@
-"""Prepare the Mini AN4 dataset for ESPnet3 ASR recipes (simplified)."""
+"""Prepare the Mini AN4 dataset for ESPnet3 ASR recipes."""
 
 from __future__ import annotations
 
-import argparse
 import logging
 import re
 import shutil
@@ -17,8 +16,6 @@ LOGGER = logging.getLogger(__name__)
 
 SPH_DIRS = {"train": "an4_clstk", "test": "an4test_clstk"}
 TRANSCRIPTS = {"train": "an4_train.transcription", "test": "an4_test.transcription"}
-
-# Expect lines like "<s> WORDS </s> (a-b-c)"
 LINE_RE = re.compile(r"^(?P<words>.+?)\s+\((?P<src>[^)]+)\)\s*$")
 
 
@@ -54,18 +51,17 @@ def ensure_extracted(archive: Path, dataset_dir: Path, logger: logging.Logger) -
 
 
 def parse_line(line: str) -> tuple[str, str, str]:
-    m = LINE_RE.match(line)
-    if not m:
+    match = LINE_RE.match(line)
+    if not match:
         raise ValueError(f"Malformed transcript line: {line}")
 
-    words = m.group("words")
-    # Remove <s> and </s> from the transcript (keeps current behavior)
+    words = match.group("words")
     if words.startswith("<s> "):
         words = words[4:]
     if words.endswith(" </s>"):
         words = words[:-5]
 
-    src = m.group("src")  # Example: abc-def-ghi
+    src = match.group("src")
     pre, mid, last = src.split("-")
     utt_id = f"{mid}-{pre}-{last}"
     return utt_id, src, words
@@ -117,16 +113,16 @@ def prepare_split(
 def write_manifest(path: Path, entries: Iterable[Entry]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("w", encoding="utf-8") as f:
-        for e in entries:
-            f.write(f"{e.utt_id}\t{e.wav_path}\t{e.text}\n")
+        for entry in entries:
+            f.write(f"{entry.utt_id}\t{entry.wav_path}\t{entry.text}\n")
 
 
-def create_dataset(dataset_dir: Path, archive_path: Path | None = None) -> None:
+def create_dataset(dataset_dir: Path, archive_path: Path) -> None:
     dataset_dir = Path(dataset_dir)
+    archive_path = Path(archive_path)
     logger = setup_logger(name="mini_an4.create_dataset")
 
-    archive = Path("../../../egs2/mini_an4/asr1/downloads.tar.gz")
-    an4_root = ensure_extracted(archive, dataset_dir, logger=logger)
+    an4_root = ensure_extracted(archive_path, dataset_dir, logger=logger)
 
     sph2pipe = shutil.which("sph2pipe")
     if not sph2pipe:
@@ -144,11 +140,3 @@ def create_dataset(dataset_dir: Path, archive_path: Path | None = None) -> None:
     write_manifest(manifest_dir / "test.tsv", test)
 
     LOGGER.info("Prepared Mini AN4 manifests under %s", manifest_dir)
-
-
-if __name__ == "__main__":
-    p = argparse.ArgumentParser(description="Prepare Mini AN4 dataset")
-    p.add_argument("--dataset_dir", type=Path, required=True)
-    p.add_argument("--archive_path", type=Path, default=None)
-    a = p.parse_args()
-    create_dataset(a.dataset_dir, archive_path=a.archive_path)

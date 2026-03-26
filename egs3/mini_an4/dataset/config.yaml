@@ -1,0 +1,7 @@
+dataset_name: mini_an4
+downloads_subdir: downloads
+archive_path: ../../../egs2/mini_an4/asr1/downloads.tar.gz
+required_files:
+  - manifest/train_nodev.tsv
+  - manifest/train_dev.tsv
+  - manifest/test.tsv

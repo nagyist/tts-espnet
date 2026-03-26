@@ -7,6 +7,8 @@ from pathlib import Path
 
 from omegaconf import DictConfig, ListConfig, OmegaConf
 
+from espnet3.utils.dataset_module import get_dataset_root
+
 # Used to rewrite relative paths in resolver expressions such as
 # `${load_yaml:conf/train.yaml,...}` during config loading.
 _RELATIVE_RESOLVER_PATTERN = re.compile(
@@ -96,9 +98,24 @@ def load_yaml(path, key=None):
     return value
 
 
+def dataset_root(dataset_name, recipe_dir=None):
+    """Resolve the canonical artifact root for a dataset module."""
+    return str(get_dataset_root(dataset_name, recipe_dir=recipe_dir))
+
+
+def dataset_path(dataset_name, relpath="", recipe_dir=None):
+    """Resolve a path under the canonical dataset artifact root."""
+    root = get_dataset_root(dataset_name, recipe_dir=recipe_dir)
+    if relpath is None or str(relpath).strip() == "":
+        return str(root)
+    return str(root / str(relpath))
+
+
 OMEGACONF_ESPNET3_RESOLVER = {
     "load_line": load_line,
     "load_yaml": load_yaml,
+    "dataset_root": dataset_root,
+    "dataset_path": dataset_path,
 }
 for name, resolver in OMEGACONF_ESPNET3_RESOLVER.items():
     OmegaConf.register_new_resolver(name, resolver)
