@@ -32,6 +32,13 @@ The Emilia dataset includes six languages: English (EN), Chinese (ZH), German (D
 The `--lang` argument must use one of the short codes listed above. When set, the dataset download and preprocessing steps will run for that language only. If not specified, the default language is English.
 
 # Results
+## Environments
+- date: `Wed Mar 25 19:56:06 EDT 2026`
+- python version: `3.11.14`
+- espnet version: `espnet 202511`
+- Git hash: `fe549eb691e79a9906956afaeee155faa97ab170`
+  - Commit date: `Thu Mar 26 11:10:35 EDT 2026`
+
 Epoch 700
 | Metric | Value |
 |:--|--:|
@@ -43,3 +50,5 @@ Epoch 700
 | Whisper CER | 0.22 |
 | SingMOS | 3.71 |
 | Speaker similarity | 0.35 |
+
+The model can be accessed at: [https://huggingface.co/NewGame/Emilia-vits-espnet2](https://huggingface.co/NewGame/Emilia-vits-espnet2)
