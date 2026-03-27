@@ -81,7 +81,7 @@ install_torch(){
 }
 check_python_version(){
     if $(python_plus $1) || ! $(python_plus 3.7); then
-        log "[ERROR] pytorch=${torch_version} for python>=$1 is not available, but your python is ${python_version}"
+        log "[ERROR] pytorch=${torch_version} requires python>=$1,<=3.7, but your python is ${python_version}"
         exit 1
     fi
 }
