@@ -24,24 +24,29 @@ def _to_plain_dict(config: Any) -> dict[str, Any]:
 
 
 def dataset_module_name(dataset_name: str) -> str:
+    """Return the import path for a dataset module under ``egs3``."""
     return f"egs3.{dataset_name}.dataset"
 
 
 def load_dataset_module(dataset_name: str):
+    """Import and return the dataset module for ``dataset_name``."""
     return import_module(dataset_module_name(dataset_name))
 
 
 def get_dataset_builder_class(dataset_name: str):
+    """Return the ``DatasetBuilder`` class exposed by the dataset module."""
     module = load_dataset_module(dataset_name)
     return getattr(module, "DatasetBuilder")
 
 
 def get_dataset_class(dataset_name: str):
+    """Return the ``Dataset`` class exposed by the dataset module."""
     module = load_dataset_module(dataset_name)
     return getattr(module, "Dataset")
 
 
 def get_dataset_root(dataset_name: str, recipe_dir: str | Path | None = None) -> Path:
+    """Resolve the root dir for a dataset, using module overrides when available."""
     module = load_dataset_module(dataset_name)
     if hasattr(module, "get_dataset_root"):
         return Path(module.get_dataset_root(recipe_dir=recipe_dir))
@@ -54,6 +59,7 @@ def instantiate_dataset_reference(
     config: Mapping[str, Any] | DictConfig,
     recipe_dir: str | Path | None = None,
 ):
+    """Instantiate a dataset reference object from a config mapping."""
     plain = _to_plain_dict(config)
     dataset_name = plain.pop("dataset")
     plain.pop("name", None)
@@ -68,6 +74,7 @@ def ensure_dataset_reference_prepared(
     config: Mapping[str, Any] | DictConfig,
     recipe_dir: str | Path | None = None,
 ) -> None:
+    """Build dataset reference for the config if they are not already prepared."""
     plain = _to_plain_dict(config)
     dataset_name = plain.pop("dataset")
     plain.pop("name", None)
