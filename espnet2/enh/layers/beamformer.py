@@ -3,7 +3,6 @@
 from typing import List, Union
 
 import torch
-from packaging.version import parse as V
 from torch_complex import functional as FC
 from torch_complex.tensor import ComplexTensor
 
@@ -20,7 +19,6 @@ from espnet2.enh.layers.complex_utils import (
     to_double,
 )
 
-is_torch_1_9_plus = V(torch.__version__) >= V("1.9.0")
 EPS = torch.finfo(torch.double).eps
 
 
@@ -244,8 +242,7 @@ def get_rtf(
         rtf = matmul(psd_speech, rtf)
     elif mode == "evd":
         assert (
-            is_torch_1_9_plus
-            and is_torch_complex_tensor(psd_speech)
+            is_torch_complex_tensor(psd_speech)
             and is_torch_complex_tensor(psd_noise)
         )
         e_vec = generalized_eigenvalue_decomposition(psd_speech, psd_noise)[1]
@@ -771,8 +768,7 @@ def get_gev_vector(
         e_vec = e_vec.squeeze(-1)
     elif mode == "evd":
         assert (
-            is_torch_1_9_plus
-            and is_torch_complex_tensor(psd_speech)
+            is_torch_complex_tensor(psd_speech)
             and is_torch_complex_tensor(psd_noise)
         )
         # e_vec = generalized_eigenvalue_decomposition(psd_speech, psd_noise)[1][...,-1]
