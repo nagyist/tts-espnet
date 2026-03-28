@@ -348,9 +348,7 @@ class Reporter:
         )
         stats["total_count"] = sub_reporter.total_count
         if torch.cuda.is_initialized():
-                stats["gpu_max_cached_mem_GB"] = (
-                    torch.cuda.max_memory_reserved() / 2**30
-                )
+            stats["gpu_max_cached_mem_GB"] = torch.cuda.max_memory_reserved() / 2**30
 
         self.stats.setdefault(self.epoch, {})[sub_reporter.key] = stats
         sub_reporter.finished()

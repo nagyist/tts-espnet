@@ -22,7 +22,6 @@ from espnet2.svs.feats_extract.score_feats_extract import (
 from espnet2.tts.feats_extract.abs_feats_extract import AbsFeatsExtract
 
 
-
 class ESPnetDiscreteSVSModel(ESPnetSVSModel):
     """ESPnet model for singing voice synthesis task."""
 

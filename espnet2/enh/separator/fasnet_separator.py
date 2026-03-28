@@ -8,7 +8,6 @@ from espnet2.enh.layers.ifasnet import iFaSNet
 from espnet2.enh.separator.abs_separator import AbsSeparator
 
 
-
 class FaSNetSeparator(AbsSeparator):
     def __init__(
         self,

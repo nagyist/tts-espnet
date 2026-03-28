@@ -18,7 +18,6 @@ from espnet2.mt.espnet_model import ESPnetMTModel
 from espnet2.torch_utils.device_funcs import force_gatherable
 
 
-
 class ESPnetDiscreteASRModel(ESPnetMTModel):
     """Encoder-Decoder model"""
 

@@ -12,7 +12,6 @@ from espnet2.legacy.nets.pytorch_backend.conformer.encoder import (
 from espnet2.legacy.nets.pytorch_backend.nets_utils import make_non_pad_mask
 
 
-
 class ConformerSeparator(AbsSeparator):
     def __init__(
         self,

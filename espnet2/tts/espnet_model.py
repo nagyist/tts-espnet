@@ -16,7 +16,6 @@ from espnet2.tts.abs_tts import AbsTTS
 from espnet2.tts.feats_extract.abs_feats_extract import AbsFeatsExtract
 
 
-
 class ESPnetTTSModel(AbsESPnetModel):
     """ESPnet model for text-to-speech task."""
 

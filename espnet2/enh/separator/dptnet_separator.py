@@ -10,7 +10,6 @@ from espnet2.enh.layers.tcn import choose_norm
 from espnet2.enh.separator.abs_separator import AbsSeparator
 
 
-
 class DPTNetSeparator(AbsSeparator):
     def __init__(
         self,

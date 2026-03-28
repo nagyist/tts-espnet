@@ -8,7 +8,6 @@ from espnet2.enh.layers.complex_utils import is_complex
 from espnet2.enh.separator.abs_separator import AbsSeparator
 
 
-
 class TCNSeparatorNomask(AbsSeparator):
     def __init__(
         self,

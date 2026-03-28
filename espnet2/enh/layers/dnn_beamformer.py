@@ -12,8 +12,6 @@ import espnet2.enh.layers.beamformer_th as bf_v2
 from espnet2.enh.layers.complex_utils import stack, to_double, to_float
 from espnet2.enh.layers.mask_estimator import MaskEstimator
 
-
-
 BEAMFORMER_TYPES = (
     # Minimum Variance Distortionless Response beamformer
     "mvdr",  # RTF-based formula

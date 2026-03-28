@@ -28,7 +28,6 @@ if torch.distributed.is_available():
     from torch.distributed import ReduceOp
 
 
-
 try:
     import fairscale
 except ImportError:

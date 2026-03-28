@@ -63,9 +63,7 @@ class STFTDecoder(AbsDecoder):
                 If not None, reconfigure iSTFT window and hop lengths for a new
                 sampling rate while keeping their duration fixed.
         """
-        if not isinstance(input, ComplexTensor) and (
-            not torch.is_complex(input)
-        ):
+        if not isinstance(input, ComplexTensor) and (not torch.is_complex(input)):
             raise TypeError("Only support complex tensors for stft decoder")
         if fs is not None:
             self._reconfig_for_fs(fs)

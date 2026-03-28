@@ -19,7 +19,6 @@ from espnet2.layers.abs_normalize import AbsNormalize
 from espnet2.torch_utils.device_funcs import force_gatherable
 
 
-
 class PITLossWrapper(AbsLossWrapper):
     def __init__(self, criterion_fn: Callable, num_ref: int):
         super().__init__()

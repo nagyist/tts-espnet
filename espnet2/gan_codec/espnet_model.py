@@ -13,7 +13,6 @@ from espnet2.gan_codec.abs_gan_codec import AbsGANCodec
 from espnet2.train.abs_gan_espnet_model import AbsGANESPnetModel
 
 
-
 class ESPnetGANCodecModel(AbsGANESPnetModel):
     """ESPnet model for GAN-based neural codec task."""
 

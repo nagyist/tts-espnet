@@ -23,7 +23,6 @@ from espnet2.train.abs_espnet_model import AbsESPnetModel
 from espnet2.tts.feats_extract.abs_feats_extract import AbsFeatsExtract
 
 
-
 class ESPnetSVSModel(AbsESPnetModel):
     """ESPnet model for singing voice synthesis task."""
 

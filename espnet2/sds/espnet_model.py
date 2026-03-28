@@ -18,8 +18,6 @@ from espnet2.sds.utils.chat import Chat
 from espnet2.sds.vad.webrtc_vad import WebrtcVADModel
 from espnet2.train.abs_espnet_model import AbsESPnetModel
 
-
-
 try:
     import gradio as gr
 

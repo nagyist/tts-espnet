@@ -40,7 +40,6 @@ AVAILABLE_DISCRIMINATORS = {
 }
 
 
-
 class VITS(AbsGANTTS):
     """VITS module (generator + discriminator).
 

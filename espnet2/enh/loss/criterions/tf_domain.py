@@ -8,7 +8,6 @@ import torch.nn.functional as F
 from espnet2.enh.layers.complex_utils import complex_norm, is_complex, new_complex_like
 from espnet2.enh.loss.criterions.abs_loss import AbsEnhLoss
 
-
 EPS = torch.finfo(torch.get_default_dtype()).eps
 
 

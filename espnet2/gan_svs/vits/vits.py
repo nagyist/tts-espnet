@@ -57,7 +57,6 @@ AVAILABLE_DISCRIMINATORS = {
 }
 
 
-
 class VITS(AbsGANSVS):
     """VITS module (generator + discriminator).
 

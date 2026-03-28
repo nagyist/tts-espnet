@@ -17,7 +17,6 @@ from espnet2.tts2.feats_extract.abs_feats_extract import AbsFeatsExtractDiscrete
 from espnet2.tts.feats_extract.abs_feats_extract import AbsFeatsExtract
 
 
-
 class ESPnetTTS2Model(AbsESPnetModel):
     """ESPnet model for text-to-speech task."""
 

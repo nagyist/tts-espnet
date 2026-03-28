@@ -23,7 +23,6 @@ from espnet2.torch_utils.device_funcs import force_gatherable
 from espnet2.train.abs_espnet_model import AbsESPnetModel
 
 
-
 class ESPnetSLUModel(ESPnetASRModel):
     """CTC-attention hybrid Encoder-Decoder model"""
 

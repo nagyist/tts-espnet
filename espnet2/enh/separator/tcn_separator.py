@@ -9,7 +9,6 @@ from espnet2.enh.layers.tcn import TemporalConvNet
 from espnet2.enh.separator.abs_separator import AbsSeparator
 
 
-
 class TCNSeparator(AbsSeparator):
     def __init__(
         self,

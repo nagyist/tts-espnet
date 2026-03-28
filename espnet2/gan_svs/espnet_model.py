@@ -23,7 +23,6 @@ from espnet2.train.abs_gan_espnet_model import AbsGANESPnetModel
 from espnet2.tts.feats_extract.abs_feats_extract import AbsFeatsExtract
 
 
-
 class ESPnetGANSVSModel(AbsGANESPnetModel):
     """ESPnet model for GAN-based singing voice synthesis task."""
 

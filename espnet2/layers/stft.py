@@ -9,7 +9,6 @@ from espnet2.layers.inversible_interface import InversibleInterface
 from espnet2.legacy.nets.pytorch_backend.nets_utils import make_pad_mask
 
 
-
 class Stft(torch.nn.Module, InversibleInterface):
     @typechecked
     def __init__(

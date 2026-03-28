@@ -17,7 +17,6 @@ from espnet2.torch_utils.device_funcs import force_gatherable
 from espnet2.train.abs_espnet_model import AbsESPnetModel
 
 
-
 class ESPnetEnhS2TModel(AbsESPnetModel):
     """Joint model Enhancement and Speech to Text."""
 

@@ -28,8 +28,6 @@ from espnet2.layers.mixup_augmentation import MixupAugment
 from espnet2.torch_utils.device_funcs import force_gatherable
 from espnet2.train.abs_espnet_model import AbsESPnetModel
 
-
-
 logger = logging.getLogger(__name__)
 
 

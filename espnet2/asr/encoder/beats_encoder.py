@@ -40,7 +40,6 @@ from espnet2.asr.specaug.specaug import SpecAug
 from espnet2.legacy.nets.pytorch_backend.nets_utils import make_pad_mask, roll_tensor
 
 
-
 class BeatsConfig:
     def __init__(self, cfg=None):
         self.input_patch_size: int = 16  # patch size of patch embedding

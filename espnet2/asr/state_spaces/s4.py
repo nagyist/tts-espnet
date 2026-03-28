@@ -257,8 +257,10 @@ def _conj(x):
 _c2r = torch.view_as_real
 _r2c = torch.view_as_complex
 
+
 def _resolve_conj(x):
     return x.conj().resolve_conj()
+
 
 """ Misc functional utilities """
 

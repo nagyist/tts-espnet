@@ -9,7 +9,6 @@ from espnet2.enh.layers.dprnn import DPRNN, merge_feature, split_feature
 from espnet2.enh.separator.abs_separator import AbsSeparator
 
 
-
 class DPRNNSeparator(AbsSeparator):
     def __init__(
         self,

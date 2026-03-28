@@ -19,8 +19,6 @@ from espnet2.uasr.loss.abs_loss import AbsUASRLoss
 from espnet2.uasr.segmenter.abs_segmenter import AbsSegmenter
 from espnet2.utils.types import str2bool
 
-
-
 try:
     import kenlm  # for CI import
 except (ImportError, ModuleNotFoundError):

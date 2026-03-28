@@ -22,7 +22,6 @@ from espnet2.enh.separator.uses_separator import USESSeparator
 from espnet2.torch_utils.device_funcs import force_gatherable
 from espnet2.train.abs_espnet_model import AbsESPnetModel
 
-
 EPS = torch.finfo(torch.get_default_dtype()).eps
 
 

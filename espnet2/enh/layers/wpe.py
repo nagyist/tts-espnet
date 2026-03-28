@@ -7,7 +7,6 @@ from torch_complex.tensor import ComplexTensor
 
 from espnet2.enh.layers.complex_utils import einsum, matmul, reverse
 
-
 """ WPE pytorch version: Ported from https://github.com/fgnt/nara_wpe
 Many functions aren't enough tested"""
 
@@ -168,9 +167,7 @@ def perform_filter_operation(
         complex_module = torch
         pad_func = F.pad
     else:
-        raise ValueError(
-            "Input must be a ComplexTensor or a complex torch.Tensor."
-        )
+        raise ValueError("Input must be a ComplexTensor or a complex torch.Tensor.")
 
     T = Y.size(-1)
     # Y_tilde: (taps, F, C, T)
