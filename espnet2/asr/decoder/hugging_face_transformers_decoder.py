@@ -219,9 +219,7 @@ class HuggingFaceTransformersDecoder(AbsDecoder, BatchScorerInterface):
             for key, value in state_dict.items():
                 if isinstance(value, torch.Tensor) and value.device.type == "meta":
                     # Create a new tensor on CPU with the same shape and dtype
-                    materialized_state_dict[key] = torch.empty_like(
-                        value, device="cpu"
-                    )
+                    materialized_state_dict[key] = torch.empty_like(value, device="cpu")
                 else:
                     materialized_state_dict[key] = value
             return copy.deepcopy(materialized_state_dict)
