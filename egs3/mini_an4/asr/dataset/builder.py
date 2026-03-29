@@ -204,11 +204,7 @@ class MiniAN4Builder(DatasetBuilder):
                     continue
                 utt_id, src, text = _parse_transcript_line(line)
                 sph = (
-                    an4
-                    / "wav"
-                    / spec["sph_subdir"]
-                    / src.split("-")[1]
-                    / f"{src}.sph"
+                    an4 / "wav" / spec["sph_subdir"] / src.split("-")[1] / f"{src}.sph"
                 )
                 wav = (data / "wav" / split / f"{utt_id}.wav").resolve()
                 wav.parent.mkdir(parents=True, exist_ok=True)
