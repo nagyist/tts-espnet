@@ -1,7 +1,7 @@
 """ASR system implementation and tokenizer training helpers.
 
-This module adds ASR-specific stages on top of the base system, including
-tokenizer training and dataset creation hooks.
+This module adds ASR-specific stages on top of the base system, primarily
+tokenizer training support.
 """
 
 import logging
@@ -13,26 +13,8 @@ from typing import Iterable
 
 from espnet3.systems.asr.tokenizers.sentencepiece import train_sentencepiece
 from espnet3.systems.base.system import BaseSystem
-from espnet3.utils.dataset_module import ensure_dataset_reference_prepared
 
 logger = logging.getLogger(__name__)
-
-
-def load_function(path):
-    """Load a callable from a dotted module path.
-
-    Args:
-        path: Dotted module path (e.g., ``package.module.function``).
-
-    Returns:
-        Callable referenced by the path.
-
-    Raises:
-        (Exception): Propagated import or attribute lookup errors.
-    """
-    module_path, func_name = path.rsplit(".", 1)
-    module = import_module(module_path)
-    return getattr(module, func_name)
 
 
 class ASRSystem(BaseSystem):
@@ -40,7 +22,6 @@ class ASRSystem(BaseSystem):
 
     This system adds:
       - Tokenizer training inside train()
-      - Dataset creation via ``create_dataset``
 
     Additional stage log paths:
         | Stage           | Path reference                  |
@@ -65,60 +46,6 @@ class ASRSystem(BaseSystem):
             },
             **kwargs,
         )
-
-    def create_dataset(self, *args, **kwargs):
-        """Create datasets using the configured helper function.
-
-        The callable is resolved from ``training_config.create_dataset.func`` and
-        invoked with the remaining configuration values.
-
-        Raises:
-            RuntimeError: If the configuration does not specify a function.
-        """
-        self._reject_stage_args("create_dataset", args, kwargs)
-        logger.info("ASRSystem.create_dataset(): starting dataset creation process")
-        start = time.perf_counter()
-        dataset_config = getattr(self.training_config, "dataset", None)
-        recipe_dir = getattr(self.training_config, "recipe_dir", None)
-        prepared: set[tuple[str, tuple[tuple[str, str], ...]]] = set()
-        result = None
-        if dataset_config is not None:
-            for split_name in ("train", "valid", "test"):
-                entries = getattr(dataset_config, split_name, None)
-                if entries is None:
-                    continue
-                for entry in entries:
-                    dataset_name = getattr(entry, "dataset", None)
-                    if not isinstance(dataset_name, str):
-                        continue
-                    extras = {}
-                    for key, value in entry.items():
-                        if key in {"dataset", "name", "split", "transform"}:
-                            continue
-                        extras[key] = str(value)
-                    marker = (dataset_name, tuple(sorted(extras.items())))
-                    if marker in prepared:
-                        continue
-                    logger.info("Ensuring dataset is prepared: %s", dataset_name)
-                    ensure_dataset_reference_prepared(entry, recipe_dir=recipe_dir)
-                    prepared.add(marker)
-
-        if len(prepared) == 0:
-            config = getattr(self.training_config, "create_dataset", None)
-            if config is None or not getattr(config, "func", None):
-                raise RuntimeError(
-                    "No dataset references or legacy create_dataset.func found in "
-                    "training config."
-                )
-            fn = load_function(config.func)
-            extra = {k: v for k, v in config.items() if k != "func"}
-            logger.info("Creating dataset with legacy function %s", config.func)
-            result = fn(**extra)
-        logger.info(
-            "Dataset creation completed in %.2fs",
-            time.perf_counter() - start,
-        )
-        return result
 
     def train(self, *args, **kwargs):
         """Train the model, training the tokenizer first if needed.
@@ -181,7 +108,8 @@ class ASRSystem(BaseSystem):
                 "training_config.tokenizer.text_builder.func must be set to build "
                 "tokenizer text."
             )
-        builder = load_function(builder_config.func)
+        module_path, func_name = builder_config.func.rsplit(".", 1)
+        builder = getattr(import_module(module_path), func_name)
         builder_kwargs = {k: v for k, v in builder_config.items() if k != "func"}
         logger.info("Building tokenizer training text via %s", builder_config.func)
         built = builder(**builder_kwargs)

@@ -9,7 +9,7 @@ from omegaconf import DictConfig
 
 from espnet2.train.preprocessor import AbsPreprocessor
 from espnet3.components.data.dataset import CombinedDataset, DatasetWithTransform
-from espnet3.utils.dataset_module import instantiate_dataset_reference
+from espnet3.components.data.dataset_module import instantiate_dataset_reference
 from espnet3.utils.logging_utils import build_callable_name, build_qualified_name
 
 logger = logging.getLogger(__name__)
@@ -44,7 +44,9 @@ class DatasetConfig:
     """
 
     name: Optional[str] = None
+    ref: Optional[str] = None
     dataset: Any = None
+    kwargs: Optional[Dict[str, Any]] = None
     transform: Optional[Dict[str, Any]] = None
     split: Optional[str] = None
 
@@ -182,7 +184,8 @@ class DataOrganizer:
                 if isinstance(config, (dict, DictConfig)):
                     config = DatasetConfig(**config)
                 dataset = config.dataset
-                if isinstance(dataset, str):
+                ref = getattr(config, "ref", None)
+                if isinstance(dataset, str) or isinstance(ref, str) or dataset is None:
                     dataset = instantiate_dataset_reference(raw_config)
                 elif isinstance(dataset, (dict, DictConfig)):
                     dataset = instantiate(dataset)
@@ -238,7 +241,8 @@ class DataOrganizer:
                     config = DatasetConfig(**config)
 
                 dataset = config.dataset
-                if isinstance(dataset, str):
+                ref = getattr(config, "ref", None)
+                if isinstance(dataset, str) or isinstance(ref, str) or dataset is None:
                     dataset = instantiate_dataset_reference(raw_config)
                 elif isinstance(dataset, (dict, DictConfig)):
                     dataset = instantiate(dataset)
@@ -251,7 +255,7 @@ class DataOrganizer:
                 if isinstance(transform, (dict, DictConfig)):
                     transform = instantiate(transform)
 
-                name = config.name or config.split or str(config.dataset)
+                name = config.name or config.split or str(config.ref or config.dataset)
                 self.test_sets[name] = DatasetWithTransform(
                     dataset,
                     transform,

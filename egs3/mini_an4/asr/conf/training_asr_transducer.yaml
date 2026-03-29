@@ -18,10 +18,12 @@ exp_tag: train_asr_transducer
 dataset:
   train:
     - ref: mini_an4/asr
-      split: train
+      kwargs:
+        split: train
   valid:
     - ref: mini_an4/asr
-      split: dev
+      kwargs:
+        split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
     train: true
@@ -29,6 +31,9 @@ dataset:
     token_list: ${tokenizer.save_path}/tokens.txt
     bpemodel: ${tokenizer.save_path}/bpe.model
     text_cleaner:
+
+create_dataset:
+  recipe_dir: ${recipe_dir}
 
 ##########################################################
 #                   TOKENIZER SETTING                    #

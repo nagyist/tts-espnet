@@ -21,10 +21,12 @@ exp_tag: train_asr_rnn_data_aug
 dataset:
   train:
     - ref: mini_an4/asr
-      split: train
+      kwargs:
+        split: train
   valid:
     - ref: mini_an4/asr
-      split: dev
+      kwargs:
+        split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
     fs: 16000
@@ -42,6 +44,9 @@ dataset:
     token_type: bpe
     token_list: ${tokenizer.save_path}/tokens.txt
     bpemodel: ${tokenizer.save_path}/bpe.model
+
+create_dataset:
+  recipe_dir: ${recipe_dir}
 
 ##########################################################
 #                   TOKENIZER SETTING                    #
@@ -118,7 +123,12 @@ dataloader:
     iter_factory:
       batches:
         type: sorted
-        batch_size: 2
+        batch_size: 1
+  valid:
+    iter_factory:
+      batches:
+        type: sorted
+        batch_size: 1
 
 ##########################################################
 #                    TRAINER SETTING                     #

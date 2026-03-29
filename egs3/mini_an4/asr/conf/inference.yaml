@@ -16,7 +16,8 @@ dataset:
   test:
     - ref: mini_an4/asr
       name: test
-      split: test
+      kwargs:
+        split: test
 
 ##########################################################
 #                    MODEL AND OUTPUT                    #
