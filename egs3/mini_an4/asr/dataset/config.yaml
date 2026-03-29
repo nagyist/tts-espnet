@@ -1,7 +1,7 @@
 builder:
   dataset_path: downloads
   data_path: data
-  archive_path: ../../../egs2/mini_an4/asr1/downloads.tar.gz
+  archive_path: ./downloads.tar.gz
   splits:
     train:
       transcript_name: an4_train.transcription
