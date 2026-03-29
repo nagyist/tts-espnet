@@ -11,9 +11,8 @@ import numpy as np
 import soundfile as sf
 from torch.utils.data import Dataset as TorchDataset
 
-from espnet3.utils.config_utils import load_config_with_defaults
 from egs3.mini_an4.asr.dataset.builder import MiniAN4Builder
-
+from espnet3.utils.config_utils import load_config_with_defaults
 
 # ---------------------------------------------------------------------------
 # Module-level config loading
