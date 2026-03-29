@@ -24,11 +24,11 @@ inference_dir: ${exp_dir}/inference
 # Use the same manifest layout as the other mini_an4 debug configs.
 dataset:
   train:
-    - dataset: mini_an4
-      split: train_nodev
+    - ref: mini_an4/asr
+      split: train
   valid:
-    - dataset: mini_an4
-      split: train_dev
+    - ref: mini_an4/asr
+      split: dev
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
     train: true
@@ -47,7 +47,7 @@ tokenizer:
   save_path: ${data_dir}/${tokenizer.model_type}_${tokenizer.vocab_size}
   text_builder:
     func: src.tokenizer.gather_training_text
-    manifest_path: ${dataset_path:mini_an4,manifest/train_nodev.tsv}
+    manifest_path: ${data_dir}/manifest/train.tsv
 
 ##########################################################
 #                      MODEL SETTING                     #

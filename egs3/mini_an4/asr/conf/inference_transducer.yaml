@@ -13,7 +13,8 @@ inference_dir: ${exp_dir}/inference
 
 dataset:
   test:
-    - dataset: mini_an4
+    - ref: mini_an4/asr
+      name: test
       split: test
 
 ##########################################################
