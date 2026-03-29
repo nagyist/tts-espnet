@@ -11,14 +11,13 @@
 ##########################################################
 exp_tag: ${load_yaml:training.yaml,exp_tag}
 inference_dir: ${exp_dir}/inference
-dataset_dir: ${data_dir}/mini_an4
 
 dataset:
   test:
-    - name: test
-      dataset:
-        _target_: src.dataset.MiniAN4Dataset
-        manifest_path: ${dataset_dir}/manifest/test.tsv
+    - ref: mini_an4/asr
+      name: test
+      kwargs:
+        split: test
 
 ##########################################################
 #                    MODEL AND OUTPUT                    #

@@ -9,17 +9,7 @@
 ##########################################################
 task: espnet3.systems.asr.task.ASRTask
 
-exp_tag: train_asr_rnn_debug
-dataset_dir: ${data_dir}/mini_an4
-
-##########################################################
-#                 DATASET CREATION SETTING               #
-##########################################################
-# Reuse the downloaded mini_an4 archive to create local manifests.
-create_dataset:
-  func: src.creating_dataset.create_dataset
-  dataset_dir: ${dataset_dir}
-  archive_path: ${recipe_dir}/../../egs2/mini_an4/asr1/downloads.tar.gz
+exp_tag: train_asr_rnn
 
 ##########################################################
 #                    DATASET DEFINITION                  #
@@ -27,15 +17,13 @@ create_dataset:
 # Use the tiny train/dev split prepared for CI-sized ASR runs.
 dataset:
   train:
-    - name: train_nodev
-      dataset:
-        _target_: src.dataset.MiniAN4Dataset
-        manifest_path: ${dataset_dir}/manifest/train_nodev.tsv
+    - ref: mini_an4/asr
+      kwargs:
+        split: train
   valid:
-    - name: train_dev
-      dataset:
-        _target_: src.dataset.MiniAN4Dataset
-        manifest_path: ${dataset_dir}/manifest/train_dev.tsv
+    - ref: mini_an4/asr
+      kwargs:
+        split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
     fs: 16000
@@ -55,6 +43,9 @@ dataset:
     token_list: ${tokenizer.save_path}/tokens.txt
     bpemodel: ${tokenizer.save_path}/bpe.model
 
+create_dataset:
+  recipe_dir: ${recipe_dir}
+
 ##########################################################
 #                   TOKENIZER SETTING                    #
 ##########################################################
@@ -66,7 +57,7 @@ tokenizer:
   save_path: ${data_dir}/${tokenizer.model_type}_${tokenizer.vocab_size}
   text_builder:
     func: src.tokenizer.gather_training_text
-    manifest_path: ${dataset_dir}/manifest/train_nodev.tsv
+    manifest_path: ${data_dir}/manifest/train.tsv
 
 ##########################################################
 #                      MODEL SETTING                     #

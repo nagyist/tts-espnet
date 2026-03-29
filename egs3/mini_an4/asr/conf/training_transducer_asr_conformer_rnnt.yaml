@@ -13,19 +13,10 @@ task: espnet3.systems.asr.transducer_task.ASRTransducerTask
 
 recipe_dir: .
 data_dir: ${recipe_dir}/data
-exp_tag: train_transducer_asr_conformer_rnnt_debug
+exp_tag: train_transducer_asr_conformer_rnnt
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 stats_dir: ${recipe_dir}/exp/stats
 inference_dir: ${exp_dir}/inference
-dataset_dir: ${data_dir}/mini_an4
-
-##########################################################
-#                 DATASET CREATION SETTING               #
-##########################################################
-create_dataset:
-  func: src.creating_dataset.create_dataset
-  dataset_dir: ${dataset_dir}
-  archive_path: ${recipe_dir}/../../egs2/mini_an4/asr1/downloads.tar.gz
 
 ##########################################################
 #                    DATASET DEFINITION                  #
@@ -33,15 +24,13 @@ create_dataset:
 # Use the same manifest layout as the other mini_an4 debug configs.
 dataset:
   train:
-    - name: train_nodev
-      dataset:
-        _target_: src.dataset.MiniAN4Dataset
-        manifest_path: ${dataset_dir}/manifest/train_nodev.tsv
+    - ref: mini_an4/asr
+      kwargs:
+        split: train
   valid:
-    - name: train_dev
-      dataset:
-        _target_: src.dataset.MiniAN4Dataset
-        manifest_path: ${dataset_dir}/manifest/train_dev.tsv
+    - ref: mini_an4/asr
+      kwargs:
+        split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
     train: true
@@ -49,6 +38,9 @@ dataset:
     token_list: ${tokenizer.save_path}/tokens.txt
     bpemodel: ${tokenizer.save_path}/bpe.model
     text_cleaner:
+
+create_dataset:
+  recipe_dir: ${recipe_dir}
 
 ##########################################################
 #                   TOKENIZER SETTING                    #
@@ -60,7 +52,7 @@ tokenizer:
   save_path: ${data_dir}/${tokenizer.model_type}_${tokenizer.vocab_size}
   text_builder:
     func: src.tokenizer.gather_training_text
-    manifest_path: ${dataset_dir}/manifest/train_nodev.tsv
+    manifest_path: ${data_dir}/manifest/train.tsv
 
 ##########################################################
 #                      MODEL SETTING                     #
