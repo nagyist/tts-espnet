@@ -178,6 +178,7 @@ class CombinedDataset:
         return self.cumulative_lengths[-1] if self.cumulative_lengths else 0
 
     def __getitem__(self, idx):
+        """Return the item at the given index from the appropriate sub-dataset."""
         if self._string_index_mode:
             return self._getitem_string_mode(idx)
 

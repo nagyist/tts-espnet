@@ -23,7 +23,7 @@ __all__ = [
     "CollectStatsInferenceProvider",
     "CollectStatsRunner",
     "collect_stats",
-    "batch_collect_stats",
+    "collect_stats_batch",
 ]
 
 

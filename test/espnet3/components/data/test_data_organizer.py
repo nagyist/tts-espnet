@@ -318,7 +318,10 @@ def test_data_organizer_with_string_ids():
             {
                 "name": "train_dummy",
                 "dataset": {
-                    "_target_": "test.espnet3.components.data.test_data_organizer.DummyStringKeyDataset"
+                    "_target_": (
+                        "test.espnet3.components.data"
+                        ".test_data_organizer.DummyStringKeyDataset"
+                    )
                 },
             }
         ],
@@ -326,7 +329,10 @@ def test_data_organizer_with_string_ids():
             {
                 "name": "valid_dummy",
                 "dataset": {
-                    "_target_": "test.espnet3.components.data.test_data_organizer.DummyStringKeyDataset"
+                    "_target_": (
+                        "test.espnet3.components.data"
+                        ".test_data_organizer.DummyStringKeyDataset"
+                    )
                 },
             }
         ],
