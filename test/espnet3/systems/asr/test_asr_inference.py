@@ -106,9 +106,7 @@ def test_build_model_cuda_defaults_to_logical_device_zero(monkeypatch):
 
 
 def test_build_model_cuda_uses_logical_device_index(monkeypatch):
-    cfg = OmegaConf.create(
-        {"model": {"_target_": "dummy.Model"}, "device_index": 1}
-    )
+    cfg = OmegaConf.create({"model": {"_target_": "dummy.Model"}, "device_index": 1})
     calls = {}
 
     import espnet3.systems.base.inference_provider as provider_mod

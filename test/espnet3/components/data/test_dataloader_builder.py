@@ -62,8 +62,7 @@ DUMMY_SHARDED_DATASET_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder." "DummyShardedDataset"
 )
 DUMMY_MISSING_SHARD_TARGET = (
-    "test.espnet3.components.data.test_dataloader_builder."
-    "DummyMissingShardMethod"
+    "test.espnet3.components.data.test_dataloader_builder." "DummyMissingShardMethod"
 )
 
 
@@ -421,7 +420,6 @@ dataloader:
     assert "audio_lengths" in batch[1]
 
 
-
 @pytest.mark.parametrize("flag", [True, False])
 def test_multiple_iterator_is_rejected(flag):
     organizer = build_organizer(DUMMY_DATASET_TARGET)
@@ -515,7 +513,8 @@ def _first_shard_id(loader):
 
 def test_sharded_dataset_single_gpu_multiple_shards():
     organizer = build_organizer(
-        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": 2, "world_shard_size": 1}
+        DUMMY_SHARDED_DATASET_TARGET,
+        dataset_kwargs={"num_shards": 2, "world_shard_size": 1},
     )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
@@ -573,7 +572,8 @@ def test_sharded_dataset_multi_gpu_rotates_with_epoch(monkeypatch):
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
     organizer = build_organizer(
-        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": 4, "world_shard_size": 2}
+        DUMMY_SHARDED_DATASET_TARGET,
+        dataset_kwargs={"num_shards": 4, "world_shard_size": 2},
     )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
@@ -639,20 +639,24 @@ def test_sharded_dataset_invalid_shard_count(monkeypatch, num_shards):
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
     organizer = build_organizer(
-        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": num_shards, "world_shard_size": 2}
+        DUMMY_SHARDED_DATASET_TARGET,
+        dataset_kwargs={"num_shards": num_shards, "world_shard_size": 2},
     )
     config = make_standard_dataloader_config()
     config.dataloader.train.batch_size = 1
     builder = build_builder(
         organizer.train, config, collate_fn=None, num_device=2, epoch=0
     )
-    with pytest.raises(RuntimeError, match="num_shards must be divisible by world_size"):
+    with pytest.raises(
+        RuntimeError, match="num_shards must be divisible by world_size"
+    ):
         builder.build("train")
 
 
 def test_sharded_dataset_missing_shard_method():
     organizer = build_organizer(
-        DUMMY_MISSING_SHARD_TARGET, dataset_kwargs={"num_shards": 2, "world_shard_size": 1}
+        DUMMY_MISSING_SHARD_TARGET,
+        dataset_kwargs={"num_shards": 2, "world_shard_size": 1},
     )
     config = make_standard_dataloader_config()
     builder = build_builder(
@@ -673,7 +677,8 @@ def test_sharded_dataset_world_size_mismatch(monkeypatch):
     monkeypatch.setattr(torch.distributed, "get_rank", _get_rank)
 
     organizer = build_organizer(
-        DUMMY_SHARDED_DATASET_TARGET, dataset_kwargs={"num_shards": 2, "world_shard_size": 1}
+        DUMMY_SHARDED_DATASET_TARGET,
+        dataset_kwargs={"num_shards": 2, "world_shard_size": 1},
     )
     config = make_standard_dataloader_config()
     builder = build_builder(
