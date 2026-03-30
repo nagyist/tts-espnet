@@ -13,8 +13,7 @@ inference_dir: ${exp_dir}/inference
 
 dataset:
   test:
-    - ref: mini_an4/asr
-      name: test
+    - name: test
       kwargs:
         split: test
 

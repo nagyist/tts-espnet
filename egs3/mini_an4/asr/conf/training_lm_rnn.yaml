@@ -17,12 +17,10 @@ exp_tag: train_lm_rnn
 # Reuse the ASR manifests and tokenize the transcript text for LM training.
 dataset:
   train:
-    - ref: mini_an4/asr
-      kwargs:
+    - kwargs:
         split: train
   valid:
-    - ref: mini_an4/asr
-      kwargs:
+    - kwargs:
         split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor

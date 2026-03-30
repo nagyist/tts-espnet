@@ -120,6 +120,8 @@ class DataOrganizer:
         preprocessor (Optional[Callable]): A global preprocessor function applied
             after each dataset's transform. If it's an instance of AbsPreprocessor,
             (uid, sample) is passed.
+        recipe_dir (Optional[str]): Recipe root used to resolve local dataset modules
+            when dataset entries omit ``ref`` and rely on ``recipe_dir/dataset``.
 
     Attributes:
         train (CombinedDataset): Combined dataset built from training configurations,
@@ -168,9 +170,11 @@ class DataOrganizer:
         valid: Optional[List[Union[DatasetConfig, Dict[str, Any]]]] = None,
         test: Optional[List[Union[DatasetConfig, Dict[str, Any]]]] = None,
         preprocessor: Optional[Callable[[dict], dict]] = None,
+        recipe_dir: Optional[str] = None,
     ):
         """Initialize DataOrganizer object."""
         self.preprocessor = preprocessor or do_nothing
+        self.recipe_dir = recipe_dir
         if isinstance(self.preprocessor, (dict, DictConfig)):
             self.preprocessor = instantiate(self.preprocessor)
         assert callable(self.preprocessor), "Preprocessor should be callable."
@@ -186,7 +190,10 @@ class DataOrganizer:
                 dataset = config.dataset
                 ref = getattr(config, "ref", None)
                 if isinstance(dataset, str) or isinstance(ref, str) or dataset is None:
-                    dataset = instantiate_dataset_reference(raw_config)
+                    dataset = instantiate_dataset_reference(
+                        raw_config,
+                        recipe_dir=self.recipe_dir,
+                    )
                 elif isinstance(dataset, (dict, DictConfig)):
                     dataset = instantiate(dataset)
 
@@ -243,7 +250,10 @@ class DataOrganizer:
                 dataset = config.dataset
                 ref = getattr(config, "ref", None)
                 if isinstance(dataset, str) or isinstance(ref, str) or dataset is None:
-                    dataset = instantiate_dataset_reference(raw_config)
+                    dataset = instantiate_dataset_reference(
+                        raw_config,
+                        recipe_dir=self.recipe_dir,
+                    )
                 elif isinstance(dataset, (dict, DictConfig)):
                     dataset = instantiate(dataset)
 

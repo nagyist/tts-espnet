@@ -81,6 +81,7 @@ create_dataset:
 #     _target_: src.preprocess.build_preprocessor
 dataset:
   _target_: espnet3.components.data.data_organizer.DataOrganizer
+  recipe_dir: ${recipe_dir}
   train:
   valid:
   test:

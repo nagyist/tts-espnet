@@ -5,6 +5,7 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 from espnet2.train.preprocessor import AbsPreprocessor
+from espnet3.components.data import data_organizer as data_organizer_module
 from espnet3.components.data.data_organizer import (
     DataOrganizer,
     do_nothing,
@@ -379,6 +380,33 @@ def test_data_organizer_accepts_raw_configs():
     )
     assert organizer.train[0]["text"] == "[dummy] HELLO"
     assert organizer.valid[0]["text"] == "[dummy] hello"
+
+
+def test_data_organizer_passes_recipe_dir_to_ref_less_entries(monkeypatch):
+    captured = []
+
+    def _instantiate_dataset_reference(config, recipe_dir=None):
+        captured.append((dict(config), recipe_dir))
+        return DummyDataset()
+
+    monkeypatch.setattr(
+        data_organizer_module,
+        "instantiate_dataset_reference",
+        _instantiate_dataset_reference,
+    )
+
+    organizer = DataOrganizer(
+        train=[{"kwargs": {"split": "train"}}],
+        valid=[{"kwargs": {"split": "valid"}}],
+        recipe_dir="/tmp/local_recipe",
+    )
+
+    assert len(organizer.train) == 2
+    assert len(organizer.valid) == 2
+    assert captured == [
+        ({"kwargs": {"split": "train"}}, "/tmp/local_recipe"),
+        ({"kwargs": {"split": "valid"}}, "/tmp/local_recipe"),
+    ]
 
 
 def test_data_organizer_transform_and_preprocessor():

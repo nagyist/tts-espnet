@@ -24,12 +24,10 @@ inference_dir: ${exp_dir}/inference
 # Use the same manifest layout as the other mini_an4 debug configs.
 dataset:
   train:
-    - ref: mini_an4/asr
-      kwargs:
+    - kwargs:
         split: train
   valid:
-    - ref: mini_an4/asr
-      kwargs:
+    - kwargs:
         split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor

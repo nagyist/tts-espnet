@@ -20,12 +20,10 @@ exp_tag: train_asr_rnn_data_aug
 ##########################################################
 dataset:
   train:
-    - ref: mini_an4/asr
-      kwargs:
+    - kwargs:
         split: train
   valid:
-    - ref: mini_an4/asr
-      kwargs:
+    - kwargs:
         split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
