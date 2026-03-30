@@ -1,27 +1,27 @@
 ##########################################################
 #                    TRAINING SETTING                    #
 ##########################################################
-# This is a debug config for CI.
-# Mini AN4 conformer-RNNT training config for ESPnet3 integration tests.
-
+# Quick usage:
+#   python run.py --stages create_dataset --training_config conf/training.yaml
+#   python run.py --stages train          --training_config conf/training.yaml
+#
 ##########################################################
 #                  SYSTEM AND PATH SETTING               #
 ##########################################################
-num_device: 1
-num_nodes: 1
 task: espnet3.systems.asr.transducer_task.ASRTransducerTask
 
-recipe_dir: .
-data_dir: ${recipe_dir}/data
 exp_tag: train_transducer_asr_conformer_rnnt
-exp_dir: ${recipe_dir}/exp/${exp_tag}
-stats_dir: ${recipe_dir}/exp/stats
-inference_dir: ${exp_dir}/inference
 
 ##########################################################
 #                    DATASET DEFINITION                  #
 ##########################################################
-# Use the same manifest layout as the other mini_an4 debug configs.
+# Dataset splits:
+#   train:
+#     - split="train" from the dataset.dataset.Minian4Dataset
+#   valid:
+#     - split="valid" from the dataset.dataset.Minian4Dataset
+# Notes:
+#   - actual data sources are defined via ${recipe_dir}
 dataset:
   train:
     - kwargs:

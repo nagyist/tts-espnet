@@ -5,9 +5,6 @@
 #   python run.py --stages create_dataset --training_config conf/training.yaml
 #   python run.py --stages train          --training_config conf/training.yaml
 #
-# This is a debug config for CI
-# Mini AN4 ASR training config for ESPnet3 integration tests.
-
 ##########################################################
 #                  SYSTEM AND PATH SETTING               #
 ##########################################################
@@ -18,6 +15,13 @@ exp_tag: train_asr_rnn_data_aug
 ##########################################################
 #                    DATASET DEFINITION                  #
 ##########################################################
+# Dataset splits:
+#   train:
+#     - split="train" from the dataset.dataset.Minian4Dataset
+#   valid:
+#     - split="valid" from the dataset.dataset.Minian4Dataset
+# Notes:
+#   - actual data sources are defined via ${recipe_dir}
 dataset:
   train:
     - kwargs:

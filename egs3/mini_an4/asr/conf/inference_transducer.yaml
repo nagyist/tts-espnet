@@ -4,13 +4,15 @@
 # Quick usage:
 #   python run.py --stages infer --inference_config conf/inference.yaml
 #
-# Mini AN4 ASR inference config for ESPnet3 integration tests.
 ##########################################################
 #                    PATHS AND INPUTS                    #
 ##########################################################
 exp_dir: ${load_yaml:training.yaml,exp_dir}
 inference_dir: ${exp_dir}/inference
 
+# Dataset specification:
+#   test:
+#     - uses the "test" split defined in the dataset.dataset.Minian4Dataset
 dataset:
   test:
     - name: test

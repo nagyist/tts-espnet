@@ -1,9 +1,10 @@
 ##########################################################
 #                    TRAINING SETTING                    #
 ##########################################################
-# This is a debug config for CI.
-# Mini AN4 LM-RNN training config for ESPnet3 integration tests.
-
+# Quick usage:
+#   python run.py --stages create_dataset --training_config conf/training.yaml
+#   python run.py --stages train          --training_config conf/training.yaml
+#
 ##########################################################
 #                  SYSTEM AND PATH SETTING               #
 ##########################################################
@@ -14,7 +15,13 @@ exp_tag: train_lm_rnn
 ##########################################################
 #                    DATASET DEFINITION                  #
 ##########################################################
-# Reuse the ASR manifests and tokenize the transcript text for LM training.
+# Dataset splits:
+#   train:
+#     - split="train" from the dataset.dataset.Minian4Dataset
+#   valid:
+#     - split="valid" from the dataset.dataset.Minian4Dataset
+# Notes:
+#   - actual data sources are defined via ${recipe_dir}
 dataset:
   train:
     - kwargs:
