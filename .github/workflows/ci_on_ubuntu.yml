@@ -92,7 +92,7 @@ jobs:
           use-conda: ${{ matrix.use-conda }}
       - name: test python
         run: ./ci/test_python_espnet2.sh
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           flags: test_python_espnet2
       - name: coverage erase
@@ -129,7 +129,7 @@ jobs:
           use-conda: ${{ matrix.use-conda }}
       - name: test utils
         run: ./ci/test_utils.sh
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           flags: test_utils
       - name: coverage erase
@@ -205,7 +205,7 @@ jobs:
         run: ./ci/install_kaldi.sh
       - name: test espnet2 integration
         run: ./ci/test_integration_espnet2.sh ${{ matrix.config-task }}
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           flags: test_integration_espnet2
 
@@ -238,7 +238,7 @@ jobs:
           use-conda: ${{ matrix.use-conda }}
       - name: test configuration
         run: ./ci/test_configuration_espnet2.sh ${{ matrix.config-task }}
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           flags: test_configuration_espnet2
 
@@ -270,7 +270,7 @@ jobs:
           use-conda: ${{ matrix.use-conda }}
       - name: test python
         run: ./ci/test_python_espnet3.sh
-      - uses: codecov/codecov-action@v5
+      - uses: codecov/codecov-action@v6
         with:
           flags: test_python_espnet3
       - name: coverage erase
