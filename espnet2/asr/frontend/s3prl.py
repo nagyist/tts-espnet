@@ -24,12 +24,26 @@ class S3prlFrontend(AbsFrontend):
         layer: int = -1,
     ):
         try:
+            import sys
+            import types
+
             import torchaudio
 
             # torchaudio >= 2.1 removed set_audio_backend; patch it for s3prl
             # compatibility (s3prl's byol_s submodule calls it at import time)
             if not hasattr(torchaudio, "set_audio_backend"):
                 torchaudio.set_audio_backend = lambda *args, **kwargs: None
+
+            # torchaudio >= 2.x removed the sox_effects submodule; mock it for
+            # s3prl compatibility (mos_prediction/expert.py imports from it).
+            # The real apply_effects_tensor/apply_effects_file applied SoX audio
+            # effects; mocking as no-ops is safe for import-time compatibility.
+            if "torchaudio.sox_effects" not in sys.modules:
+                _sox = types.ModuleType("torchaudio.sox_effects")
+                _sox.apply_effects_tensor = lambda *args, **kwargs: None
+                _sox.apply_effects_file = lambda *args, **kwargs: None
+                sys.modules["torchaudio.sox_effects"] = _sox
+                torchaudio.sox_effects = _sox
 
             import s3prl
             from s3prl.nn import Featurizer, S3PRLUpstream
