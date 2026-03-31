@@ -6,7 +6,6 @@
 from typing import Any, Dict
 
 import torch
-from torch.cuda.amp import autocast
 from typeguard import typechecked
 
 from espnet2.gan_codec.abs_gan_codec import AbsGANCodec

@@ -2,8 +2,6 @@ import time
 from typing import Optional, Tuple
 
 import numpy as np
-import torch
-from torch.cuda.amp import autocast
 from typeguard import typechecked
 
 from espnet2.sds.asr.espnet_asr import ESPnetASRModel

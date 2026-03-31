@@ -3,7 +3,6 @@ from collections import defaultdict
 from typing import Callable, Dict, List, Optional, Tuple, Union
 
 import torch
-from torch.cuda.amp import autocast
 from typeguard import typechecked
 
 from espnet2.asr.ctc import CTC

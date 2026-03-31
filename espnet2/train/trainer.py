@@ -33,12 +33,12 @@ from espnet2.train.distributed_utils import DistributedOption
 from espnet2.train.reporter import Reporter, SubReporter
 from espnet2.utils.build_dataclass import build_dataclass
 from espnet2.utils.kwargs2args import kwargs2args
+from torch.cuda.amp import GradScaler, autocast
 
 if torch.distributed.is_available():
     from torch.distributed import ReduceOp
 
 autocast_args = dict()
-from torch.cuda.amp import GradScaler, autocast
 
 if torch.cuda.is_available() and torch.cuda.is_bf16_supported():
     autocast_args = dict(dtype=torch.bfloat16)

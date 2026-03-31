@@ -6,7 +6,6 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
-from torch.cuda.amp import autocast
 from typeguard import typechecked
 
 from espnet2.asr.espnet_model import ESPnetASRModel

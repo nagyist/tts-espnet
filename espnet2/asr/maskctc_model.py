@@ -4,7 +4,6 @@ from typing import Dict, List, Optional, Tuple, Union
 
 import numpy
 import torch
-from torch.cuda.amp import autocast
 from typeguard import typechecked
 
 from espnet2.asr.ctc import CTC

@@ -15,7 +15,6 @@ import numpy as np
 import torch
 import torch.nn as nn
 from torch.nn import functional as F
-from torch.nn.utils.parametrizations import weight_norm
 
 from espnet2.gan_codec.shared.encoder.seanet import (
     SLSTM,
