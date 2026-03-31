@@ -64,7 +64,7 @@ if python3 -c 'import torch as t; from packaging.version import parse as L; asse
     if [ "${task}" == "asr" ] || [ "${task}" == "all" ]; then
         for f in egs2/*/asr1/conf/train_asr*.yaml; do
             if [[ ${s3prl_confs} =~ \"${f}\" ]]; then
-                if ! python3 -c "import s3prl" &> /dev/null; then
+                if ! python3 -c "from s3prl.nn import Featurizer, S3PRLUpstream" &> /dev/null; then
                     continue
                 fi
             fi

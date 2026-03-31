@@ -298,7 +298,9 @@ class JETS(AbsGANTTS):
             if mos_pred_tool == "utmos":
                 # Load predictor for UTMOS22 (https://arxiv.org/abs/2204.02152)
                 self.predictor = torch.hub.load(
-                    "tarepan/SpeechMOS:v1.2.0", "utmos22_strong"
+                    "tarepan/SpeechMOS:v1.2.0",
+                    "utmos22_strong",
+                    trust_repo=True,
                 )
             else:
                 raise NotImplementedError(

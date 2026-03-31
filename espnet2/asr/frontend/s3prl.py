@@ -24,6 +24,13 @@ class S3prlFrontend(AbsFrontend):
         layer: int = -1,
     ):
         try:
+            import torchaudio
+
+            # torchaudio >= 2.1 removed set_audio_backend; patch it for s3prl
+            # compatibility (s3prl's byol_s submodule calls it at import time)
+            if not hasattr(torchaudio, "set_audio_backend"):
+                torchaudio.set_audio_backend = lambda *args, **kwargs: None
+
             import s3prl
             from s3prl.nn import Featurizer, S3PRLUpstream
         except Exception as e:
