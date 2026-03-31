@@ -13,6 +13,7 @@ import numpy as np
 import torch
 import torch.nn
 import torch.optim
+from torch.cuda.amp import GradScaler, autocast
 from typeguard import typechecked
 
 from espnet2.iterators.abs_iter_factory import AbsIterFactory
@@ -33,7 +34,6 @@ from espnet2.train.distributed_utils import DistributedOption
 from espnet2.train.reporter import Reporter, SubReporter
 from espnet2.utils.build_dataclass import build_dataclass
 from espnet2.utils.kwargs2args import kwargs2args
-from torch.cuda.amp import GradScaler, autocast
 
 if torch.distributed.is_available():
     from torch.distributed import ReduceOp
