@@ -22,7 +22,7 @@ inference_dir: ${exp_dir}/inference
 # hardcoding a dataset name again.
 #
 # Example:
-# dataset_dir: ${load_yaml:training.yaml,dataset_dir}
+# dataset_dir: ${recipe_dir}/data
 
 
 # Test split definitions are required for inference.

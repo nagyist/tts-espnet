@@ -7,7 +7,6 @@
 ##########################################################
 #                    PATHS AND INPUTS                    #
 ##########################################################
-exp_dir: ${load_yaml:training.yaml,exp_dir}
 inference_dir: ${exp_dir}/inference
 
 # Dataset specification:
