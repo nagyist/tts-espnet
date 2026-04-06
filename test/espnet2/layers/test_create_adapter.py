@@ -24,7 +24,7 @@ def init_S3prl_model():
             super().__init__()
             try:
                 self.frontend = S3prlFrontend(frontend_conf=frontend_conf)
-            except Exception:
+            except AttributeError:
                 return None
 
     return Model()
