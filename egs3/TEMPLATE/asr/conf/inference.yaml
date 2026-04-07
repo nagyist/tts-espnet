@@ -33,14 +33,16 @@ inference_dir: ${exp_dir}/inference
 # dataset:
 #   _target_: espnet3.components.data.data_organizer.DataOrganizer
 #   test:
-#     - name: test-clean
-#       dataset:
-#         _target_: src.dataset.YourDataset
-#         manifest_path: ${dataset_dir}/manifest/test-clean.tsv
-#     - name: test-other
-#       dataset:
-#         _target_: src.dataset.YourDataset
-#         manifest_path: ${dataset_dir}/manifest/test-other.tsv
+#     - name: librispeech_test_clean
+#       data_src: librispeech/asr
+#       data_src_args:
+#         split: test_clean
+#         data_path: ${dataset_dir}
+#     - name: librispeech_test_other
+#       data_src: librispeech/asr
+#       data_src_args:
+#         split: test_other
+#         data_path: ${dataset_dir}
 #
 # When training already defines `dataset_dir`, prefer referencing that shared
 # location rather than requiring users to specify a second dataset path just

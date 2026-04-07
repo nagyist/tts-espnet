@@ -15,7 +15,7 @@ inference_dir: ${exp_dir}/inference
 dataset:
   test:
     - name: test
-      kwargs:
+      data_src_args:
         split: test
 
 ##########################################################

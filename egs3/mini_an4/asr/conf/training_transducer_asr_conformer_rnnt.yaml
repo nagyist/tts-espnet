@@ -23,10 +23,10 @@ exp_tag: train_transducer_asr_conformer_rnnt
 #   - actual data sources are defined via ${recipe_dir}
 dataset:
   train:
-    - kwargs:
+    - data_src_args:
         split: train
   valid:
-    - kwargs:
+    - data_src_args:
         split: valid
   preprocessor:
     _target_: espnet2.train.preprocessor.CommonPreprocessor
