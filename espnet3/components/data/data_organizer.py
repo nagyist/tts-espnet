@@ -242,7 +242,9 @@ class DataOrganizer:
                 if isinstance(transform, (dict, DictConfig)):
                     transform = instantiate(transform)
 
-                name = raw_config.get("name") or str(raw_config.get("data_src") or "local")
+                name = raw_config.get("name") or str(
+                    raw_config.get("data_src") or "local"
+                )
                 self.test_sets[name] = DatasetWithTransform(
                     dataset,
                     transform,

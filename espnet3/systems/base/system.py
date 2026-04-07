@@ -211,13 +211,9 @@ class BaseSystem:
 
                 builder_kwargs = dict(default_builder_kwargs)
 
-                module = load_dataset_module(
-                    data_src=data_src, recipe_dir=recipe_dir
-                )
+                module = load_dataset_module(data_src=data_src, recipe_dir=recipe_dir)
                 builder = getattr(module, self.DATASET_BUILDER_CLASS_NAME)()
-                logger.info(
-                    "Ensuring dataset is prepared: %s", data_src or "local"
-                )
+                logger.info("Ensuring dataset is prepared: %s", data_src or "local")
 
                 # Ensure raw source exists first, then build task-ready artifacts.
                 if not builder.is_source_prepared(**builder_kwargs):
