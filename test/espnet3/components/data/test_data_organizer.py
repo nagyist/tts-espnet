@@ -156,15 +156,9 @@ def _entry(name: str, *, transform: bool = False, data_src: str = DUMMY_DATA_SRC
 @pytest.fixture
 def dummy_dataset_config():
     config = {
-        "train": [
-            _entry("train_dummy", transform=True)
-        ],
-        "valid": [
-            _entry("valid_dummy")
-        ],
-        "test": [
-            _entry("test_dummy")
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
+        "test": [_entry("test_dummy")],
     }
     config = OmegaConf.create(config)
     return config
@@ -218,12 +212,8 @@ def test_data_organizer_init(dummy_dataset_config):
 
 def test_data_organizer_without_test():
     config = {
-        "train": [
-            _entry("train_dummy", transform=True)
-        ],
-        "valid": [
-            _entry("valid_dummy")
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
         # No "test" field
     }
     config = OmegaConf.create(config)
@@ -242,9 +232,7 @@ def test_data_organizer_test_only():
     config = {
         # No "train"
         # No "valid"
-        "test": [
-            _entry("test_dummy", transform=True)
-        ],
+        "test": [_entry("test_dummy", transform=True)],
     }
 
     organizer = DataOrganizer(test=config["test"], preprocessor=DummyPreprocessor())

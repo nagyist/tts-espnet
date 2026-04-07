@@ -155,9 +155,7 @@ def load_dataset_module(
         AssertionError: recipe_dir must be set when data_src is None.
     """
     if data_src is None:
-        assert recipe_dir is not None, (
-            "recipe_dir must be set when data_src is None."
-        )
+        assert recipe_dir is not None, "recipe_dir must be set when data_src is None."
 
         # Local recipe mode: load <recipe_dir>/dataset/__init__.py directly.
         return _load_local_dataset_module(recipe_dir)
