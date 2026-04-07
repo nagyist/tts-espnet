@@ -33,6 +33,28 @@ class DatasetConfig:
             a transform applied to each sample after loading.
         split (Optional[str]): Optional split label kept for compatibility with
             configs that still carry it as metadata.
+
+    Examples:
+        Recipe-backed dataset entry:
+            >>> config_dict = {
+            ...     "name": "custom",
+            ...     "data_src": "mini_an4/asr",
+            ...     "data_src_args": {"split": "test"},
+            ...     "transform": {
+            ...         "_target_": "my_project.transforms.uppercase_transform",
+            ...     },
+            ... }
+            >>> config = DatasetConfig(**config_dict)
+            >>> config.data_src
+            'mini_an4/asr'
+
+        Local recipe dataset entry:
+            >>> config = DatasetConfig(
+            ...     name="local_eval",
+            ...     data_src_args={"split": "eval"},
+            ... )
+            >>> config.data_src is None
+            True
     """
 
     name: Optional[str] = None
