@@ -15,7 +15,7 @@ recipe_dir: .
 exp_tag:
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 data_dir: ${recipe_dir}/data
-inference_dir: ${exp_dir}/inference
+inference_dir: ${exp_dir}/${self_name:}
 
 # If inference needs access to manifests under the same dataset root as
 # training, define `dataset_dir` here by reusing the training config instead of

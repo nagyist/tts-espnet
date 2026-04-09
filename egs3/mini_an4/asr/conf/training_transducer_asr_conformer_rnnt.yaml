@@ -10,7 +10,6 @@
 ##########################################################
 task: espnet3.systems.asr.transducer_task.ASRTransducerTask
 
-exp_tag: train_transducer_asr_conformer_rnnt
 ##########################################################
 #                    DATASET DEFINITION                  #
 ##########################################################

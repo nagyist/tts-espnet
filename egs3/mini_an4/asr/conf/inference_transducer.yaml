@@ -7,7 +7,6 @@
 ##########################################################
 #                    PATHS AND INPUTS                    #
 ##########################################################
-inference_dir: ${exp_dir}/inference
 
 # Dataset specification:
 #   test:

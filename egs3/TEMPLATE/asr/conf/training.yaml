@@ -24,10 +24,9 @@ task:
 # Path scaffold relative to the recipe root.
 recipe_dir: .
 data_dir: ${recipe_dir}/data
-exp_tag:
+exp_tag: ${self_name:}
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 stats_dir: ${recipe_dir}/exp/stats
-inference_dir: ${exp_dir}/inference
 
 # Directory where this recipe stores prepared manifests and any recipe-local
 # dataset artifacts.
@@ -63,20 +62,23 @@ create_dataset:
 # dataset:
 #   _target_: espnet3.components.data.data_organizer.DataOrganizer
 #   train:
-#     - name: train
-#       dataset:
-#         _target_: src.dataset.YourDataset
-#         manifest_path: ${dataset_dir}/manifest/train.tsv
+#     - name: librispeech_train
+#       data_src: librispeech/asr
+#       data_src_args:
+#         split: train
+#         data_path: ${dataset_dir}
 #   valid:
-#     - name: dev
-#       dataset:
-#         _target_: src.dataset.YourDataset
-#         manifest_path: ${dataset_dir}/manifest/dev.tsv
+#     - name: librispeech_dev_clean
+#       data_src: librispeech/asr
+#       data_src_args:
+#         split: dev_clean
+#         data_path: ${dataset_dir}
 #   test:
-#     - name: test
-#       dataset:
-#         _target_: src.dataset.YourDataset
-#         manifest_path: ${dataset_dir}/manifest/test.tsv
+#     - name: librispeech_test_clean
+#       data_src: librispeech/asr
+#       data_src_args:
+#         split: test_clean
+#         data_path: ${dataset_dir}
 #   preprocessor:
 #     _target_: src.preprocess.build_preprocessor
 dataset:
