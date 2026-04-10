@@ -6,7 +6,10 @@ from pathlib import Path
 
 from omegaconf import DictConfig, OmegaConf
 
-from espnet3.components.data.dataset_module import load_dataset_module
+from espnet3.components.data.dataset_module import (
+    load_dataset_module,
+    parse_dataset_reference_config,
+)
 from espnet3.systems.base.inference import infer
 from espnet3.systems.base.metric import measure
 from espnet3.systems.base.training import collect_stats, train
@@ -201,16 +204,16 @@ class BaseSystem:
                 continue
             for entry in entries:
                 plain = dict(entry)
-                ref = plain.get("ref")
-                if ref in prepared_refs:
+                data_src, _ = parse_dataset_reference_config(plain)
+                if data_src in prepared_refs:
                     continue
-                prepared_refs.add(ref)
+                prepared_refs.add(data_src)
 
                 builder_kwargs = dict(default_builder_kwargs)
 
-                module = load_dataset_module(ref=ref, recipe_dir=recipe_dir)
+                module = load_dataset_module(data_src=data_src, recipe_dir=recipe_dir)
                 builder = getattr(module, self.DATASET_BUILDER_CLASS_NAME)()
-                logger.info("Ensuring dataset is prepared: %s", ref or "local")
+                logger.info("Ensuring dataset is prepared: %s", data_src or "local")
 
                 # Ensure raw source exists first, then build task-ready artifacts.
                 if not builder.is_source_prepared(**builder_kwargs):
