@@ -148,7 +148,7 @@ def test_tag_ref_resolves_and_passes_kwargs(monkeypatch):
 
     dataset = dm.instantiate_dataset_reference(
         {
-            "data_src": tag_ref,
+            "data_src": "mini_an4/asr",
             "data_src_args": {"split": "valid", "extra_arg": "ok"},
         },
     )

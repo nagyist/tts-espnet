@@ -1,7 +1,8 @@
 # test_data_organizer.py
 import numpy as np
 import pytest
-from omegaconf import OmegaConf
+from hydra.utils import instantiate
+from omegaconf import DictConfig, OmegaConf
 
 from espnet2.train.preprocessor import AbsPreprocessor
 from espnet3.components.data import data_organizer as data_organizer_module
@@ -72,6 +73,9 @@ from espnet3.components.data.dataset import (
 
 DUMMY_TRANSFORM_TARGET = (
     "test.espnet3.components.data.test_data_organizer.DummyTransform"
+)
+DUMMY_DATASET_TARGET = (
+    "test.espnet3.components.data.test_data_organizer.DummyDataset"
 )
 DUMMY_DATA_SRC = "dummy/asr"
 DUMMY_SHARDED_DATA_SRC = "dummy/sharded"
@@ -213,7 +217,16 @@ def dummy_dataset_config():
 @pytest.fixture(autouse=True)
 def patch_dataset_reference(monkeypatch):
     def _instantiate_dataset_reference(config, recipe_dir=None):
-        plain = OmegaConf.to_container(OmegaConf.create(config), resolve=False)
+        plain = (
+            OmegaConf.to_container(config, resolve=False)
+            if OmegaConf.is_config(config)
+            else dict(config)
+        )
+        dataset = plain.get("dataset")
+        if dataset is not None:
+            if isinstance(dataset, (dict, DictConfig)):
+                return instantiate(dataset)
+            return dataset
         if plain.get("data_src") == DUMMY_SHARDED_DATA_SRC:
             return DummyShardedDataset()
         return DummyDataset()
@@ -350,10 +363,7 @@ def test_data_organizer_with_string_ids():
         ],
     }
 
-    organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
-    )
+    organizer = DataOrganizer(train=config["train"], valid=config["valid"])
 
     assert len(organizer.train) == 2
     assert organizer.train["utt0"]["text"] == "hello"
@@ -450,8 +460,8 @@ def test_data_organizer_no_preprocessor_config():
         ],
     }
     organizer = DataOrganizer(
-        train=instantiate(OmegaConf.create(config)["train"]),
-        valid=instantiate(OmegaConf.create(config)["valid"]),
+        train=OmegaConf.create(config)["train"],
+        valid=OmegaConf.create(config)["valid"],
     )
     assert organizer.train[0]["text"] == "hello"
     assert organizer.valid[0]["text"] == "hello"
