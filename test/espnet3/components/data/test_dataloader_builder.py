@@ -52,8 +52,7 @@ DUMMY_DATASET_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder.DummyDataset"
 )
 DUMMY_SAME_LENGTH_DATASET_TARGET = (
-    "test.espnet3.components.data.test_dataloader_builder."
-    "DummyDatasetSameLength"
+    "test.espnet3.components.data.test_dataloader_builder." "DummyDatasetSameLength"
 )
 DUMMY_SAMPLER_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder." "DummySampler"
@@ -65,8 +64,7 @@ DUMMY_SHARDED_DATASET_TARGET = (
     "test.espnet3.components.data.test_dataloader_builder.DummyShardedDataset"
 )
 DUMMY_MISSING_SHARD_TARGET = (
-    "test.espnet3.components.data.test_dataloader_builder."
-    "DummyMissingShardMethod"
+    "test.espnet3.components.data.test_dataloader_builder." "DummyMissingShardMethod"
 )
 DUMMY_SHARDED_DATA_SRC = "dummy/sharded"
 

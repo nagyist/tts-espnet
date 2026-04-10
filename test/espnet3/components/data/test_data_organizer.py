@@ -74,9 +74,7 @@ from espnet3.components.data.dataset import (
 DUMMY_TRANSFORM_TARGET = (
     "test.espnet3.components.data.test_data_organizer.DummyTransform"
 )
-DUMMY_DATASET_TARGET = (
-    "test.espnet3.components.data.test_data_organizer.DummyDataset"
-)
+DUMMY_DATASET_TARGET = "test.espnet3.components.data.test_data_organizer.DummyDataset"
 DUMMY_DATA_SRC = "dummy/asr"
 DUMMY_SHARDED_DATA_SRC = "dummy/sharded"
 
