@@ -26,23 +26,30 @@ inference_dir: ${exp_dir}/${self_name:}
 
 
 # Test split definitions are required for inference.
-# `dataset.test[*].name` becomes the output subdirectory name under
-# `${inference_dir}`.
+# Each item in `dataset.test` is a dataset reference entry.
+# - `name` becomes the output subdirectory name under `${inference_dir}`
+# - `data_src` can be a `<recipe>/<task>` tag, a dotted module path, or be
+#   omitted to load `${recipe_dir}/dataset/__init__.py`
+# - `data_src_args` is forwarded to `Dataset(...)`
+# - `transform` is optional and runs before `preprocessor`
+#
+# Only `data_src_args` is passed to the recipe `Dataset` constructor.
+# Top-level fields such as `name` and `transform` are consumed by
+# `DataOrganizer`.
 #
 # Example:
 # dataset:
 #   _target_: espnet3.components.data.data_organizer.DataOrganizer
+#   recipe_dir: ${recipe_dir}
 #   test:
 #     - name: librispeech_test_clean
 #       data_src: librispeech/asr
 #       data_src_args:
 #         split: test_clean
 #         data_path: ${dataset_dir}
-#     - name: librispeech_test_other
-#       data_src: librispeech/asr
+#     - name: local_eval
 #       data_src_args:
-#         split: test_other
-#         data_path: ${dataset_dir}
+#         split: test
 #
 # When training already defines `dataset_dir`, prefer referencing that shared
 # location rather than requiring users to specify a second dataset path just
