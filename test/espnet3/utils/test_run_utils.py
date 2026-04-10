@@ -105,10 +105,7 @@ def test_apply_training_experiment_context_syncs_metrics_from_inference(
     assert metrics.inference_dir == "./custom/infer"
     assert "Inserted metrics_config.exp_tag from inference_config" in caplog.text
     assert "Inserted metrics_config.exp_dir from inference_config" in caplog.text
-    assert (
-        "Inserted metrics_config.inference_dir from inference_config"
-        in caplog.text
-    )
+    assert "Inserted metrics_config.inference_dir from inference_config" in caplog.text
 
 
 def test_apply_training_experiment_context_metrics_inference_dir_follows_inference(
