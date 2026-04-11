@@ -22,9 +22,13 @@ exp_tag: train_asr_rnn
 # - top-level keys such as `transform` stay in organizer space and are not
 #   forwarded to `Dataset(...)`.
 #
-# Effective mapping in this recipe:
-#   train -> MiniAn4Dataset(split="train")
-#   valid -> MiniAn4Dataset(split="valid")
+# Dataset splits:
+#   train:
+#     - split="train" from `MiniAn4Dataset`
+#   valid:
+#     - split="valid" from `MiniAn4Dataset`
+# Notes:
+#   - actual data sources are defined via `${recipe_dir}`
 dataset:
   train:
     - data_src_args:

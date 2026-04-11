@@ -12,6 +12,14 @@
 exp_tag: ${load_yaml:training.yaml,exp_tag}
 inference_dir: ${exp_dir}/inference
 
+##########################################################
+#                    DATASET DEFINITION                  #
+##########################################################
+# Dataset splits:
+#   test:
+#     - split="test" from `MiniAn4Dataset`
+# Notes:
+#   - actual data sources are defined via `${recipe_dir}`
 dataset:
   test:
     - name: test
