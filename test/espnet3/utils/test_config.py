@@ -418,9 +418,7 @@ exp_dir: ./exp/from_user
     assert cfg.custom_dir == "./exp/from_user/custom"
 
 
-def test_load_and_merge_config_binds_self_name_to_user_config(
-    write_yaml, monkeypatch
-):
+def test_load_and_merge_config_binds_self_name_to_user_config(write_yaml, monkeypatch):
     template = write_yaml(
         "template.yaml",
         """
