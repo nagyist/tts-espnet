@@ -8,7 +8,6 @@ for typical configurations (32k tokens × 150k vocab).
 from typing import Dict, Optional, Tuple
 
 import torch
-
 from liger_kernel.ops.fused_linear_cross_entropy import (
     LigerFusedLinearCrossEntropyFunction,
 )
