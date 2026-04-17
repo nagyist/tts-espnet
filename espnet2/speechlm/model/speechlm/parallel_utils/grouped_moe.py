@@ -31,7 +31,7 @@ import logging
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from torch.distributed.tensor import distribute_tensor, DTensor, Shard
+from torch.distributed.tensor import DTensor, Shard, distribute_tensor
 from torchtitan.distributed.deepep import (
     combine_tokens,
     dispatch_tokens,

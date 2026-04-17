@@ -34,7 +34,7 @@ import torch.nn.functional as F
 from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
     checkpoint_wrapper,
 )
-from torch.distributed.fsdp import fully_shard, MixedPrecisionPolicy
+from torch.distributed.fsdp import MixedPrecisionPolicy, fully_shard
 from torchtitan.distributed import ParallelDims
 
 from espnet2.speechlm.model.speechlm.parallel_utils.grouped_moe import (
@@ -495,8 +495,7 @@ def _setup_fsdp_prefetch(
     """
 
     layers = [
-        layer for layer in model.model.layers
-        if not isinstance(layer, nn.Identity)
+        layer for layer in model.model.layers if not isinstance(layer, nn.Identity)
     ]
     num_layers = len(layers)
     if num_layers == 0:

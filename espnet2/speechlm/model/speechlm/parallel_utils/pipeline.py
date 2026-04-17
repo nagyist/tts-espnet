@@ -16,8 +16,8 @@ from typing import Any, Dict, Tuple, Union
 import torch.nn as nn
 from torch.distributed.pipelining import PipelineStage
 from torch.distributed.pipelining.schedules import (
-    get_schedule_class,
     PipelineScheduleMulti,
+    get_schedule_class,
 )
 from torchtitan.distributed import ParallelDims
 
