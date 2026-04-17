@@ -6,10 +6,10 @@
 
 import argparse
 import logging
+import os
 import random
 import shutil
 import sys
-import os
 from pathlib import Path
 
 import numpy as np

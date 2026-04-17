@@ -16,8 +16,8 @@ import copy
 import gc
 import logging
 import time
-from typing import Dict, Optional
 from pathlib import Path
+from typing import Dict, Optional
 
 import torch
 import torch.distributed as dist
@@ -25,18 +25,17 @@ import torch.distributed.checkpoint as dcp
 import torch.nn as nn
 import wandb
 from torch.distributed.checkpoint.state_dict import (
+    StateDictOptions,
     get_model_state_dict,
     get_optimizer_state_dict,
     set_model_state_dict,
     set_optimizer_state_dict,
-    StateDictOptions,
 )
-
 from torchtitan.distributed import utils as dist_utils
 
-from espnet2.speechlm.utils.data import to_device
-from espnet2.speechlm.trainer.titan_trainer import TitanTrainer
 from espnet2.speechlm.model.speechlm.parallel_utils import build_pipeline
+from espnet2.speechlm.trainer.titan_trainer import TitanTrainer
+from espnet2.speechlm.utils.data import to_device
 
 logger = logging.getLogger(__name__)
 

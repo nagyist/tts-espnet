@@ -9,10 +9,10 @@ DeepSpeed-based training. It maintains interface compatibility with DeepSpeedTra
 
 import copy
 import gc
+import itertools
 import logging
 import math
 import time
-import itertools
 from pathlib import Path
 from typing import Any, Dict, Optional
 
@@ -23,21 +23,20 @@ import torch.nn as nn
 import wandb
 from torch.distributed.checkpoint.default_planner import DefaultLoadPlanner
 from torch.distributed.checkpoint.state_dict import (
+    StateDictOptions,
     get_model_state_dict,
     get_optimizer_state_dict,
     set_model_state_dict,
     set_optimizer_state_dict,
-    StateDictOptions,
 )
-
 from torchtitan.distributed import utils as dist_utils
 
-from espnet2.speechlm.utils.data import to_device
-from espnet2.speechlm.utils.model_summary import model_summary
 from espnet2.speechlm.model.speechlm.parallel_utils import (
     init_parallel_dims,
     parallel_strategies,
 )
+from espnet2.speechlm.utils.data import to_device
+from espnet2.speechlm.utils.model_summary import model_summary
 
 logger = logging.getLogger(__name__)
 
