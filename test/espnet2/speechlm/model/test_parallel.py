@@ -6,17 +6,15 @@ both with the conftest stub and with real transformers installed (CI).
 
 The real Liger kernel in ``lm/loss.py`` requires CUDA, so we
 monkeypatch ``LigerFusedLinearCrossEntropyFunction`` with a CPU stub
-that returns zero tensors and records call args. The file is skipped
-when ``liger_kernel`` is not importable.
+that returns zero tensors and records call args. The whole file is
+skipped (via the sibling ``conftest.py``'s ``collect_ignore_glob``)
+when ``liger_kernel.ops.fused_linear_cross_entropy`` is not importable.
 """
 
 from unittest.mock import patch
 
 import numpy as np
 import pytest
-
-pytest.importorskip("liger_kernel")
-
 import torch
 import torch.nn as nn
 
@@ -379,6 +377,38 @@ class TestFromPretrained:
         assert isinstance(model.adaptor["continuous_audio"], nn.Linear)
         assert model.adaptor["continuous_audio"].in_features == 80
 
+    def test_tie_word_embeddings(self, model_components):
+        """tie_word_embeddings=True shares embed_tokens weight with lm_head."""
+        from espnet2.speechlm.model.speechlm.lm.parallel import (
+            build_parallel_hf_class,
+        )
+
+        multimodal_io, vocab_meta = model_components
+        cls = build_parallel_hf_class("mock-model")
+        model = cls.from_pretrained(
+            "mock-model",
+            multimodal_io=multimodal_io,
+            vocab_meta=vocab_meta,
+            tie_word_embeddings=True,
+        )
+        assert model.lm_head.weight is model.model.embed_tokens.weight
+
+    def test_z_loss_weight_stored(self, model_components):
+        """z_loss_weight kwarg is stored on the model for _loss to read."""
+        from espnet2.speechlm.model.speechlm.lm.parallel import (
+            build_parallel_hf_class,
+        )
+
+        multimodal_io, vocab_meta = model_components
+        cls = build_parallel_hf_class("mock-model")
+        model = cls.from_pretrained(
+            "mock-model",
+            multimodal_io=multimodal_io,
+            vocab_meta=vocab_meta,
+            z_loss_weight=2.5e-5,
+        )
+        assert model.z_loss_weight == 2.5e-5
+
     def test_text_vocab_size_mismatch_raises(self, model_components):
         """text_end - text_start must equal the pretrained vocab_size (100)."""
         from espnet2.speechlm.model.speechlm.lm.parallel import (
@@ -465,8 +495,11 @@ class TestForward:
 
 class TestLoss:
     def test_loss_scalar(self, parallel_model):
-        """_loss returns a scalar tensor; the stub Liger returns zero so
-        we only check shape/flow, not numeric correctness."""
+        """_loss returns a scalar tensor.
+
+        The stub Liger returns zero so we only check shape/flow, not
+        numeric correctness.
+        """
         batch_size, seq_len = 1, 6
         num_stream = parallel_model.num_stream
         hidden_dim = parallel_model.config.hidden_size
@@ -504,6 +537,67 @@ class TestLoss:
         # With the zero-stub Liger, loss is 0 * 2.5 = 0, but the tensor exists.
         assert loss.shape == ()
 
+    def test_loss_stats_accumulate_across_calls(self, parallel_model):
+        """Repeated _loss calls accumulate into self._loss_stats."""
+        batch_size, seq_len = 1, 4
+        num_stream = parallel_model.num_stream
+        hidden_dim = parallel_model.config.hidden_size
+
+        last_hidden_state = torch.randn(batch_size, seq_len, hidden_dim)
+        input_ids = torch.zeros(batch_size, seq_len, num_stream, dtype=torch.long)
+        loss_mask = torch.ones(batch_size, seq_len, num_stream)
+
+        parallel_model.train()
+        parallel_model.reset_loss_stats()
+        parallel_model._loss(
+            (last_hidden_state, None), (input_ids, loss_mask)
+        )
+        count_after_one = float(parallel_model._loss_stats["count"])
+        parallel_model._loss(
+            (last_hidden_state, None), (input_ids, loss_mask)
+        )
+        count_after_two = float(parallel_model._loss_stats["count"])
+        assert count_after_two == 2 * count_after_one
+
+    def test_loss_stream_emb_dtensor(self, parallel_model):
+        """If stream_emb.weight has .full_tensor(), it's materialized."""
+        batch_size, seq_len = 1, 4
+        num_stream = parallel_model.num_stream
+        hidden_dim = parallel_model.config.hidden_size
+
+        last_hidden_state = torch.randn(batch_size, seq_len, hidden_dim)
+        input_ids = torch.zeros(batch_size, seq_len, num_stream, dtype=torch.long)
+        loss_mask = torch.ones(batch_size, seq_len, num_stream)
+
+        # Wrap the stream_emb weight with a .full_tensor() shim.
+        real_weight = parallel_model.stream_emb.weight.data
+
+        class _DTensorShim:
+            full_tensor_calls = 0
+
+            def __init__(self, tensor):
+                self._tensor = tensor
+                self.dtype = tensor.dtype
+                self.device = tensor.device
+
+            def full_tensor(self):
+                _DTensorShim.full_tensor_calls += 1
+                return self._tensor
+
+            def to(self, *args, **kwargs):
+                return self._tensor.to(*args, **kwargs)
+
+        shim = _DTensorShim(real_weight)
+        # monkey-patch the stream_emb.weight attribute with a DTensor shim
+        object.__setattr__(parallel_model.stream_emb, "weight", shim)
+
+        parallel_model.train()
+        parallel_model.reset_loss_stats()
+        parallel_model._loss(
+            (last_hidden_state, None), (input_ids, loss_mask)
+        )
+        assert _DTensorShim.full_tensor_calls >= 1
+
 
 # ---------------------------------------------------------------------------
 # _embed
@@ -514,6 +608,24 @@ class TestEmbed:
         num_stream = parallel_model.num_stream
         input_ids = torch.zeros(batch_size, seq_len, num_stream, dtype=torch.long)
         kwargs = {"seqs": input_ids}
+        embeds = parallel_model._embed(input_ids, kwargs)
+        assert embeds.shape == (
+            batch_size,
+            seq_len,
+            parallel_model.config.hidden_size,
+        )
+
+    def test_embed_discrete_features_with_indices(self, parallel_model):
+        """Discrete IO with indices/feats/lengths triggers encode_batch path."""
+        batch_size, seq_len = 1, 10
+        num_stream = parallel_model.num_stream
+        input_ids = torch.zeros(batch_size, seq_len, num_stream, dtype=torch.long)
+        kwargs = {
+            "seqs": input_ids,
+            "discrete_audio_indices": torch.tensor([[0, 2, 3]]),
+            "discrete_audio_feats": torch.randn(1, 3, 80),
+            "discrete_audio_lengths": torch.tensor([3]),
+        }
         embeds = parallel_model._embed(input_ids, kwargs)
         assert embeds.shape == (
             batch_size,

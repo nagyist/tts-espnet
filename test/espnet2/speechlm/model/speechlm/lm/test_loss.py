@@ -7,13 +7,12 @@ the positional args it was invoked with. Tests assert the *flow*:
 shift-by-one, pre-masking, stream-0 vs multimodal branching, DTensor
 handling, and stats keys — not numerical loss values.
 
-The file is skipped when ``liger_kernel`` is not importable.
+The whole file is skipped (via the ``test/espnet2/speechlm/model/``
+``conftest.py``'s ``collect_ignore_glob``) when
+``liger_kernel.ops.fused_linear_cross_entropy`` is not importable.
 """
 
 import pytest
-
-pytest.importorskip("liger_kernel")
-
 import torch
 
 from espnet2.speechlm.model.speechlm.lm import loss as loss_mod

@@ -12,16 +12,15 @@ The heavy paths — ``from_pretrained``, ``_empty_init``, ``forward``
 meta-device materialization. They are intentionally left to integration
 testing on a multi-GPU host.
 
-Skipped when ``liger_kernel`` is not importable (transitive via
-``parallel.py`` → ``loss.py``).
+The whole file is skipped (via the ``test/espnet2/speechlm/model/``
+``conftest.py``'s ``collect_ignore_glob``) when
+``liger_kernel.ops.fused_linear_cross_entropy`` is not importable
+(transitive via ``parallel.py`` → ``loss.py``).
 """
 
 from unittest.mock import patch
 
 import pytest
-
-pytest.importorskip("liger_kernel")
-
 import torch
 import torch.nn as nn
 
@@ -37,6 +36,17 @@ class _MockInnerModel(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
+
+    def forward(self, inputs_embeds=None, position_ids=None, **kwargs):
+        class _Out:
+            pass
+
+        out = _Out()
+        out.last_hidden_state = inputs_embeds
+        out.past_key_values = None
+        out.router_logits = None
+        out.get = lambda key, default=None: default
+        return out
 
 
 class _MockHFModel(nn.Module):
@@ -232,3 +242,168 @@ class TestPruneToStage:
         assert model.lm_head is not None
         assert model.stream_emb is not None
         assert model.model.norm is not None
+
+
+# ---------------------------------------------------------------------------
+# forward: pp_degree==1 branch delegates to ParallelLLM.forward
+# ---------------------------------------------------------------------------
+class TestForwardSingleStage:
+    """Forward path when there is only one pipeline stage.
+
+    When pp_degree == 1 there is only one stage, so forward() just
+    delegates to the parent ParallelLLM.forward(**kwargs). We reuse
+    the test_parallel mock infrastructure by re-classing a ParallelLLM
+    instance into ParallelPPLLM and setting the stage metadata by hand
+    — this avoids the full from_pretrained path which needs
+    torch.distributed.
+    """
+
+    def _build_single_stage_model(self, monkeypatch):
+        # Fake Liger is already in sys.modules via /tmp launcher when this
+        # file is exercised with liger present. Also monkeypatch to avoid
+        # the real kernel path inside _loss.
+        import torch
+
+        class _FakeLigerFn:
+            @staticmethod
+            def apply(*args):
+                return (
+                    torch.zeros((), requires_grad=True),
+                    torch.zeros(()),
+                    torch.zeros(()),
+                )
+
+        monkeypatch.setattr(
+            "espnet2.speechlm.model.speechlm.lm.loss."
+            "LigerFusedLinearCrossEntropyFunction",
+            _FakeLigerFn,
+        )
+
+        from espnet2.speechlm.model.speechlm.lm.parallel import (
+            build_parallel_hf_class,
+        )
+        from espnet2.speechlm.model.speechlm.lm.parallel_pp import (
+            build_parallel_pp_hf_class,
+        )
+
+        # Build a regular ParallelLLM first (no distributed).
+        text_io = _make_text_io()
+        audio_io = _make_audio_io()
+        multimodal_io = nn.ModuleDict(
+            {"text": text_io, "discrete_audio": audio_io}
+        )
+        vocab_meta = _make_vocab_meta(text_io, audio_io)
+
+        parallel_cls = build_parallel_hf_class("mock-model")
+        model = parallel_cls.from_pretrained(
+            "mock-model",
+            multimodal_io=multimodal_io,
+            vocab_meta=vocab_meta,
+        )
+
+        # Re-class to the PP subclass and stamp the minimal PP metadata
+        # the forward() branch check reads.
+        pp_cls = build_parallel_pp_hf_class("mock-model")
+        model.__class__ = pp_cls
+        model.pp_rank = 0
+        model.pp_degree = 1
+        model.is_first_stage = True
+        model.is_last_stage = True
+        model.stage_idx = 0
+        model.num_virtual_stages = 1
+        model.z_loss_weight = 0.0
+        return model
+
+    def test_forward_delegates_to_super(self, monkeypatch):
+        import torch
+
+        model = self._build_single_stage_model(monkeypatch)
+        batch_size, seq_len = 1, 5
+        num_stream = model.num_stream
+        seqs = torch.zeros(batch_size, seq_len, num_stream, dtype=torch.long)
+        loss_masks = torch.ones(batch_size, seq_len, num_stream)
+        model.train()
+        model.reset_loss_stats()
+        out = model(seqs=seqs, loss_masks=loss_masks)
+        assert isinstance(out, torch.Tensor)
+        assert out.ndim == 0
+
+
+# ---------------------------------------------------------------------------
+# Mock IOs + vocab_meta helper (used by TestForwardSingleStage)
+# ---------------------------------------------------------------------------
+from espnet2.speechlm.model.speechlm.multimodal_io.abs_io import AbsIO  # noqa
+
+
+class _MockDiscreteIO(AbsIO):
+    """Minimal discrete IO mirroring the one in test_parallel.py."""
+
+    def __init__(self, vocab_size=100, n_stream=1, modality="text"):
+        super().__init__(modality=modality, is_discrete=True)
+        self._vocab_size = vocab_size
+        self._n_stream = n_stream
+
+    def num_stream(self):
+        return self._n_stream
+
+    def get_vocabulary(self):
+        return [f"{self.modality}_tok_{i}" for i in range(self._vocab_size)]
+
+    def get_stream_interval(self):
+        per = self._vocab_size // self._n_stream
+        return [(i * per, (i + 1) * per) for i in range(self._n_stream)]
+
+    def get_stream_weight(self):
+        return [1.0] * self._n_stream
+
+    def encode_batch(self, feats, lengths):
+        return torch.zeros(feats.shape[0], 3, self._n_stream, dtype=torch.long)
+
+    def copy_for_worker(self):
+        return self
+
+    def feature_dim(self):
+        return None
+
+    def dummy_forward(self, ref_tensor=None):
+        return torch.zeros(1, requires_grad=True)
+
+
+def _make_text_io():
+    return _MockDiscreteIO(vocab_size=100, n_stream=1, modality="text")
+
+
+def _make_audio_io():
+    return _MockDiscreteIO(vocab_size=400, n_stream=4, modality="audio")
+
+
+def _make_vocab_meta(text_io, audio_io):
+    vocab = ["<|pad|>"] + [f"<|sp_{i}|>" for i in range(1, 256)]
+    text_start = 256
+    vocab.extend(text_io.get_vocabulary())
+    text_end = len(vocab)
+    mm_start = len(vocab)
+    vocab.extend(audio_io.get_vocabulary())
+    mm_end = len(vocab)
+    intervals = {
+        "special_token": [(0, 256)],
+        "text": [
+            (text_start + s, text_start + e)
+            for s, e in text_io.get_stream_interval()
+        ],
+        "discrete_audio": [
+            (mm_start + s, mm_start + e)
+            for s, e in audio_io.get_stream_interval()
+        ],
+    }
+    return {
+        "vocab": vocab,
+        "vocab_intervals": intervals,
+        "vocab_weight": torch.ones(len(vocab), dtype=torch.float32),
+        "vocab_size": len(vocab),
+        "mm_start": mm_start,
+        "mm_end": mm_end,
+        "text_start": text_start,
+        "text_end": text_end,
+        "num_stream": max(text_io.num_stream(), audio_io.num_stream()),
+    }

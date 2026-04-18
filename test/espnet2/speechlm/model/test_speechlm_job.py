@@ -5,17 +5,15 @@ that implement the AbsIO interface without heavy dependencies.
 
 ``SpeechLMJobTemplate`` transitively imports ``lm/loss.py`` (via
 ``lm/parallel.py``), which pulls in ``liger_kernel`` at module load
-time. Liger is not a declared project dep, so this file is skipped
-when it is not importable.
+time. Liger is not a declared project dep; the whole file is skipped
+(via the sibling ``conftest.py``'s ``collect_ignore_glob``) when
+``liger_kernel.ops.fused_linear_cross_entropy`` is not importable.
 """
 
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
-
-pytest.importorskip("liger_kernel")
-
 import torch
 
 from espnet2.speechlm.model.speechlm.multimodal_io.abs_io import AbsIO
@@ -306,6 +304,20 @@ class TestSpeechLMJobTemplate:
         ):
             job_template.build_model()
             mock_class.assert_called_once()
+
+    def test_preprocessor_no_discrete_raises(self):
+        """SpeechLMPreprocessor requires at least one discrete IO."""
+        from espnet2.speechlm.model.speechlm.speechlm_job import (
+            SpeechLMPreprocessor,
+        )
+
+        with pytest.raises(ValueError, match="at least one discrete multimodal IO"):
+            SpeechLMPreprocessor(
+                is_train=True,
+                multimodal_io={"continuous_audio": MockContinuousAudioIO()},
+                vocab=["<|pad|>"] + [f"v{i}" for i in range(255)],
+                vocab_intervals={"special_token": [(0, 256)]},
+            )
 
     def test_build_model_dispatches_parallel_pp(self, job_template):
         """With parallel_dims.pp_enabled, the `_pp` variant is selected."""
