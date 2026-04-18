@@ -2,6 +2,12 @@
 
 Injects lightweight stubs for heavy optional dependencies (transformers,
 joblib, humanfriendly) so that tests can run in CI without those packages.
+
+Additionally, ``liger_kernel`` (required by ``lm/loss.py``, which is
+imported eagerly by ``espnet2/speechlm/model/__init__.py``) is not a
+project dep. When its fused-CE submodule is not importable, we
+collect-ignore this entire subtree so the cascading import failure in
+``espnet2.speechlm.model.__init__`` does not break the wider test run.
 """
 
 import importlib.machinery
@@ -9,6 +15,24 @@ import sys
 import types
 
 import torch.nn as nn
+
+
+def _liger_fused_ce_importable():
+    try:
+        from liger_kernel.ops.fused_linear_cross_entropy import (  # noqa: F401
+            LigerFusedLinearCrossEntropyFunction,
+        )
+        return True
+    except Exception:
+        return False
+
+
+if not _liger_fused_ce_importable():
+    # Skip every .py under this conftest's directory, including the ones
+    # alongside conftest itself and any depth of nested subfolders. pytest
+    # only walks two separate match passes (same-dir / nested), so we list
+    # both patterns explicitly.
+    collect_ignore_glob = ["*.py", "*/*.py", "*/*/*.py"]
 
 
 def _install_stub(name, module):
@@ -48,6 +72,16 @@ def pytest_configure():
                 return {"input_ids": [0]}
 
         transformers.AutoTokenizer = AutoTokenizer
+
+        # AutoModelForCausalLM (used by parallel_pp.py's _empty_init).
+        class AutoModelForCausalLM:
+            @staticmethod
+            def from_config(config):
+                # Empty-init path is distributed-only and not unit-tested;
+                # return the bare MockModel so the import resolves.
+                return transformers.MockModel(config)
+
+        transformers.AutoModelForCausalLM = AutoModelForCausalLM
 
         # cache_utils
         cache_utils = types.ModuleType("transformers.cache_utils")
