@@ -246,9 +246,7 @@ class TestSpeechLMJobTemplate:
 
     def test_num_stream_matches_max(self, job_template):
         """num_stream == max stream count among discrete IOs."""
-        discrete = [
-            io for io in job_template.multimodal_io.values() if io.is_discrete
-        ]
+        discrete = [io for io in job_template.multimodal_io.values() if io.is_discrete]
         expected = max(io.num_stream() for io in discrete)
         assert job_template.vocab_meta["num_stream"] == expected
 

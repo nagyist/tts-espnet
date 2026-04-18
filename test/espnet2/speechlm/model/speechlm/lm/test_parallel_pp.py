@@ -144,9 +144,7 @@ def _make_toy_pp_model(num_layers=4):
     class _Inner(nn.Module):
         def __init__(self):
             super().__init__()
-            self.layers = nn.ModuleList(
-                [nn.Linear(4, 4) for _ in range(num_layers)]
-            )
+            self.layers = nn.ModuleList([nn.Linear(4, 4) for _ in range(num_layers)])
             self.embed_tokens = nn.Embedding(10, 4)
             self.norm = nn.LayerNorm(4)
 
@@ -177,8 +175,9 @@ class TestPruneToStage:
         prune = _get_prune_fn()
         model = _make_toy_pp_model(num_layers=4)
         originals = list(model.model.layers)
-        prune(model, layer_start=1, layer_end=3, is_first_stage=False,
-              is_last_stage=False)
+        prune(
+            model, layer_start=1, layer_end=3, is_first_stage=False, is_last_stage=False
+        )
         assert isinstance(model.model.layers[0], nn.Identity)
         assert isinstance(model.model.layers[3], nn.Identity)
         # Layers 1 and 2 kept their original module identity.

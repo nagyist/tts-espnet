@@ -22,6 +22,7 @@ def _liger_fused_ce_importable():
         from liger_kernel.ops.fused_linear_cross_entropy import (  # noqa: F401
             LigerFusedLinearCrossEntropyFunction,
         )
+
         return True
     except Exception:
         return False

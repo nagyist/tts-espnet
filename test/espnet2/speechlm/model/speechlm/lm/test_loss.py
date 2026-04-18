@@ -37,9 +37,7 @@ class _RecordingLiger:
 @pytest.fixture
 def recording_liger(monkeypatch):
     fake = _RecordingLiger()
-    monkeypatch.setattr(
-        loss_mod, "LigerFusedLinearCrossEntropyFunction", fake
-    )
+    monkeypatch.setattr(loss_mod, "LigerFusedLinearCrossEntropyFunction", fake)
     return fake
 
 
