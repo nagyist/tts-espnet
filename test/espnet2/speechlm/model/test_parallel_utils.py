@@ -102,21 +102,28 @@ if "torchtitan" not in sys.modules:
 
 
 # ---------------------------------------------------------------------------
-# Install transformers.models.qwen3_moe.modeling_qwen3_moe stub if the real
-# module fails to import (e.g. when flash_attn is broken in the environment).
+# Resolve a Qwen3MoeSparseMoeBlock base class.
+#
+# On CI, the real transformers class is importable — but its __init__ requires
+# a Qwen3MoeConfig. Locally, flash_attn may be broken, in which case we stub
+# the modeling submodule. Either way, _BareQwen3MoeSparseMoeBlock (defined
+# below) skips the parent __init__ so tests can populate attributes manually
+# (same trick GroupedMoeBlock uses in grouped_moe.py).
 # ---------------------------------------------------------------------------
 try:
-    import transformers.models.qwen3_moe.modeling_qwen3_moe  # noqa: F401
+    from transformers.models.qwen3_moe.modeling_qwen3_moe import (  # noqa: F401
+        Qwen3MoeSparseMoeBlock as _Qwen3MoeSparseMoeBlockBase,
+    )
 except Exception:
     _m = types.ModuleType("transformers.models.qwen3_moe.modeling_qwen3_moe")
     _m.__spec__ = importlib.machinery.ModuleSpec(
         "transformers.models.qwen3_moe.modeling_qwen3_moe", loader=None
     )
 
-    class _StubQwen3MoeSparseMoeBlock(nn.Module):
-        """Stub that mirrors the HF class signature used by the source."""
+    class _Qwen3MoeSparseMoeBlockBase(nn.Module):
+        """Stand-in for the real class when transformers fails to import."""
 
-    _m.Qwen3MoeSparseMoeBlock = _StubQwen3MoeSparseMoeBlock
+    _m.Qwen3MoeSparseMoeBlock = _Qwen3MoeSparseMoeBlockBase
     sys.modules["transformers.models.qwen3_moe.modeling_qwen3_moe"] = _m
 
 
@@ -143,6 +150,13 @@ from espnet2.speechlm.model.speechlm.parallel_utils.qwen3 import (  # noqa: E402
     memory_efficient_load_balancing_loss,
 )
 
+# apply_torch_compile_qwen3 calls torch._C._dynamo.eval_frame._set_lru_cache,
+# which was removed in recent torch versions. Skip compile tests when absent.
+_skip_no_set_lru_cache = pytest.mark.skipif(
+    not hasattr(torch._C._dynamo.eval_frame, "_set_lru_cache"),
+    reason="torch._C._dynamo.eval_frame._set_lru_cache unavailable on this torch",
+)
+
 
 # ---------------------------------------------------------------------------
 # Helpers: simple Qwen3-like mock MoE mlp / moe-block / transformer layer
@@ -160,11 +174,21 @@ class _MockMoeMLP(nn.Module):
         return self.down_proj(F.silu(self.gate_proj(x)) * self.up_proj(x))
 
 
+class _BareQwen3MoeSparseMoeBlock(_Qwen3MoeSparseMoeBlockBase):
+    """Qwen3MoeSparseMoeBlock subclass that skips the parent __init__.
+
+    The real parent __init__ requires a Qwen3MoeConfig and auto-instantiates
+    experts. Tests need to populate gate / experts / metadata manually, so we
+    call nn.Module.__init__ directly (the same pattern GroupedMoeBlock uses).
+    """
+
+    def __init__(self):
+        nn.Module.__init__(self)
+
+
 def _make_moe_block(num_experts=4, hidden_size=8, intermediate_size=16, top_k=2):
     """Build a minimal object that quacks like Qwen3MoeSparseMoeBlock."""
-    from transformers.models.qwen3_moe.modeling_qwen3_moe import Qwen3MoeSparseMoeBlock
-
-    block = Qwen3MoeSparseMoeBlock()
+    block = _BareQwen3MoeSparseMoeBlock()
     block.num_experts = num_experts
     block.top_k = top_k
     block.norm_topk_prob = True
@@ -272,10 +296,9 @@ class TestLoadBalancingLoss:
         assert loss.item() >= 0.0
 
     def test_balanced_routing_gives_lower_loss_than_skewed(self):
-        """Skewed routing (all tokens to one expert) has higher LB loss
-        than balanced routing (each expert equally used).
+        """Skewed routing has higher LB loss than balanced routing.
 
-        The HF load-balancing formulation: loss = E * sum_i f_i * P_i,
+        The HF load-balancing formulation is loss = E * sum_i f_i * P_i,
         minimized when both f_i (fraction of tokens) and P_i (avg router
         prob) are uniform across experts.
         """
@@ -385,8 +408,11 @@ class TestApplyActivationCheckpoint:
         assert wrapped == 4
 
     def test_moe_and_full_wraps_non_selected_layers(self):
-        """In moe_and_full mode, layers not picked by ratio still get wrapped
-        at the layer level (else branch: line 417)."""
+        """Layers not picked by ratio are still wrapped at the layer level.
+
+        In moe_and_full mode, layers that fall past the selection threshold
+        go through the else branch and get wrapped whole (qwen3.py line 417).
+        """
         from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import (
             CheckpointWrapper,
         )
@@ -439,6 +465,7 @@ class TestApplyActivationCheckpoint:
 # ===========================================================================
 # apply_torch_compile_qwen3
 # ===========================================================================
+@_skip_no_set_lru_cache
 class TestApplyTorchCompile:
     def test_skips_identity_layers(self):
         model = _MockHFModel(
@@ -636,23 +663,24 @@ class TestGroupedMoeBlock:
         assert torch.equal(wrapped._last_router_logits, router_logits)
 
     def test_is_qwen3moe_instance(self):
-        """GroupedMoeBlock must inherit from Qwen3MoeSparseMoeBlock so that
-        HF's OutputRecorder (isinstance check) captures router_logits."""
-        from transformers.models.qwen3_moe.modeling_qwen3_moe import (
-            Qwen3MoeSparseMoeBlock,
-        )
+        """GroupedMoeBlock is-a Qwen3MoeSparseMoeBlock.
 
+        HF's OutputRecorder uses an isinstance check to capture router_logits
+        from MoE blocks, so GroupedMoeBlock must inherit from the HF class.
+        """
         wrapped = GroupedMoeBlock(_make_moe_block())
-        assert isinstance(wrapped, Qwen3MoeSparseMoeBlock)
+        assert isinstance(wrapped, _Qwen3MoeSparseMoeBlockBase)
 
 
 # ===========================================================================
 # apply_grouped_moe_qwen3
 # ===========================================================================
 def _patch_cuda_identity(module):
-    """Replace .cuda() with identity so CPU-only tests can run code paths
-    that unconditionally move tensors to GPU. Default-arg pattern avoids
-    late-binding — each lambda closes over its own module reference."""
+    """Replace .cuda() with identity so CPU-only tests can exercise GPU paths.
+
+    Each lambda captures its module via a default arg to avoid late-binding
+    over the loop variable.
+    """
     for m in module.modules():
         m.cuda = lambda *a, _m=m, **kw: _m
 
@@ -757,6 +785,7 @@ class TestParallelizeQwen3HF:
         for layer in out.model.layers:
             assert isinstance(layer, CheckpointWrapper)
 
+    @_skip_no_set_lru_cache
     def test_compile_branch(self):
         """Exercise the compile=True branch in parallelize_qwen3_hf."""
         from torchtitan.distributed import ParallelDims
@@ -797,8 +826,10 @@ class TestParallelizeQwen3HF:
 # ===========================================================================
 class TestInitParallelDims:
     def test_parses_titan_config(self):
-        """init_parallel_dims forwards titan_config keys to ParallelDims
-        and returns (parallel_dims, local_rank, global_rank)."""
+        """init_parallel_dims forwards titan_config keys to ParallelDims.
+
+        Returns (parallel_dims, local_rank, global_rank).
+        """
         from unittest.mock import patch
 
         from espnet2.speechlm.model.speechlm.parallel_utils.parallel_dims import (
@@ -867,8 +898,11 @@ class TestInitParallelDims:
 # ===========================================================================
 class TestBuildPipeline:
     def test_single_stage_path(self):
-        """Exercise the single-stage 1F1B schedule path with patched
-        PipelineStage and schedule class."""
+        """Exercise the single-stage 1F1B schedule path.
+
+        Uses patched PipelineStage and schedule class so no distributed
+        initialization is required.
+        """
         from unittest.mock import MagicMock, patch
 
         from espnet2.speechlm.model.speechlm.parallel_utils import pipeline
@@ -916,8 +950,11 @@ class TestBuildPipeline:
         assert schedule.loss_fn((t,), None) is t
 
     def test_single_stage_unwraps_list_of_one(self):
-        """Passing an nn.ModuleList with exactly one chunk to a single-stage
-        schedule should unwrap and proceed."""
+        """An nn.ModuleList with one chunk is unwrapped for single-stage.
+
+        A single-stage schedule given a one-chunk ModuleList proceeds as if
+        the chunk were passed directly.
+        """
         from unittest.mock import MagicMock, patch
 
         from espnet2.speechlm.model.speechlm.parallel_utils import pipeline
