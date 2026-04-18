@@ -289,9 +289,7 @@ class TestForwardSingleStage:
         # Build a regular ParallelLLM first (no distributed).
         text_io = _make_text_io()
         audio_io = _make_audio_io()
-        multimodal_io = nn.ModuleDict(
-            {"text": text_io, "discrete_audio": audio_io}
-        )
+        multimodal_io = nn.ModuleDict({"text": text_io, "discrete_audio": audio_io})
         vocab_meta = _make_vocab_meta(text_io, audio_io)
 
         parallel_cls = build_parallel_hf_class("mock-model")
@@ -388,12 +386,10 @@ def _make_vocab_meta(text_io, audio_io):
     intervals = {
         "special_token": [(0, 256)],
         "text": [
-            (text_start + s, text_start + e)
-            for s, e in text_io.get_stream_interval()
+            (text_start + s, text_start + e) for s, e in text_io.get_stream_interval()
         ],
         "discrete_audio": [
-            (mm_start + s, mm_start + e)
-            for s, e in audio_io.get_stream_interval()
+            (mm_start + s, mm_start + e) for s, e in audio_io.get_stream_interval()
         ],
     }
     return {

@@ -549,13 +549,9 @@ class TestLoss:
 
         parallel_model.train()
         parallel_model.reset_loss_stats()
-        parallel_model._loss(
-            (last_hidden_state, None), (input_ids, loss_mask)
-        )
+        parallel_model._loss((last_hidden_state, None), (input_ids, loss_mask))
         count_after_one = float(parallel_model._loss_stats["count"])
-        parallel_model._loss(
-            (last_hidden_state, None), (input_ids, loss_mask)
-        )
+        parallel_model._loss((last_hidden_state, None), (input_ids, loss_mask))
         count_after_two = float(parallel_model._loss_stats["count"])
         assert count_after_two == 2 * count_after_one
 
@@ -593,9 +589,7 @@ class TestLoss:
 
         parallel_model.train()
         parallel_model.reset_loss_stats()
-        parallel_model._loss(
-            (last_hidden_state, None), (input_ids, loss_mask)
-        )
+        parallel_model._loss((last_hidden_state, None), (input_ids, loss_mask))
         assert _DTensorShim.full_tensor_calls >= 1
 
 
