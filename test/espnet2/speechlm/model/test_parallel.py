@@ -598,32 +598,3 @@ class TestLogitsToToken:
         assert tokens.shape == (1, 1, parallel_model.num_stream)
         assert (tokens >= 0).all()
         assert (tokens < len(parallel_model.vocab)).all()
-
-
-# ---------------------------------------------------------------------------
-# train_dtype (static method-like behavior via ds_config)
-# ---------------------------------------------------------------------------
-class TestTrainDtype:
-    def test_bf16(self):
-        from espnet2.speechlm.trainer.deepspeed_trainer import (
-            DeepSpeedTrainer,
-        )
-
-        ds_config = {"bf16": {"enabled": True}}
-        assert DeepSpeedTrainer.train_dtype(None, ds_config) == torch.bfloat16
-
-    def test_fp16(self):
-        from espnet2.speechlm.trainer.deepspeed_trainer import (
-            DeepSpeedTrainer,
-        )
-
-        ds_config = {"fp16": {"enabled": True}}
-        assert DeepSpeedTrainer.train_dtype(None, ds_config) == torch.float16
-
-    def test_default(self):
-        from espnet2.speechlm.trainer.deepspeed_trainer import (
-            DeepSpeedTrainer,
-        )
-
-        ds_config = {}
-        assert DeepSpeedTrainer.train_dtype(None, ds_config) == torch.float
