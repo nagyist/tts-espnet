@@ -1,22 +1,22 @@
-# Training settings
+# Char Conformer (3 encoder blocks); batch_bins 16M, accum_grad 4.
 batch_type: numel
-batch_bins: 10000          # keep small for debugging, increase later
-accum_grad: 2              # reduce for single GPU
-max_epoch: 50              # train shorter first
+batch_bins: 16000000
+num_workers: 8
+accum_grad: 4
+max_epoch: 60
 patience: none
 init: xavier_uniform
 best_model_criterion:
 -   - valid
-    - acc
-    - max
-keep_nbest_models: 3
+    - loss
+    - min
+keep_nbest_models: 10
 grad_clip: 5.0
 seed: 777
 
-# Encoder: Conformer (can also switch to transformer)
 encoder: conformer
 encoder_conf:
-    output_size: 256        # smaller for faster training
+    output_size: 256
     attention_heads: 4
     linear_units: 1024
     num_blocks: 3
@@ -32,7 +32,6 @@ encoder_conf:
     use_cnn_module: true
     cnn_module_kernel: 17
 
-# Decoder: Transformer
 decoder: transformer
 decoder_conf:
     attention_heads: 4
@@ -43,13 +42,13 @@ decoder_conf:
     self_attention_dropout_rate: 0.2
     src_attention_dropout_rate: 0.2
 
-# Model
 model_conf:
     ctc_weight: 0.3
     lsm_weight: 0.1
     length_normalized_loss: false
+    report_cer: true
+    report_wer: true
 
-# Optimizer
 optim: adam
 optim_conf:
     lr: 0.0005
@@ -57,7 +56,6 @@ scheduler: warmuplr
 scheduler_conf:
     warmup_steps: 20000
 
-# SpecAugment
 specaug: specaug
 specaug_conf:
     apply_time_warp: true
@@ -69,9 +67,3 @@ specaug_conf:
     apply_time_mask: true
     time_mask_width_range: [0, 40]
     num_time_mask: 2
-
-# Reporting
-model_conf:
-    ctc_weight: 0.3 # hybrid CTC/attention (default)
-    report_cer: true
-    report_wer: true

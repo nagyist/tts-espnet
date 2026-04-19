@@ -13,32 +13,37 @@
 
 ## Marathi ASR — `marathi_lrec2020`
 
-This recipe is for the **Marathi language** and is trained on the
-[**IndicCorpora Marathi dataset**](https://www.cse.iitb.ac.in/~pjyothi/indiccorpora/#marathi).
-All experiments use **Conformer architectures** with different tokenization schemes and frontends.
+Recipe for **Marathi** ASR on the
+[**IndicCorpora Marathi subset**](https://www.cse.iitb.ac.in/~pjyothi/indiccorpora/#marathi).
+
+Training uses **`conf/train_asr_transformer.yaml`** (character Conformer: 3 blocks, 256-dim encoder, `batch_bins: 16000000`, `accum_grad: 4`, Adam `lr: 0.0005`, warmup 20k, SpecAugment, hybrid CTC/attention `ctc_weight: 0.3`).
+
+Decoding without LM: **`conf/decode_asr.yaml`** (`lm_weight: 0.0`).  
+Decoding with LM (match reported fusion): **`conf/decode_asr_lm.yaml`** (beam 20, `ctc_weight: 0.5`, `lm_weight: 0.3`).
 
 ---
 
-### Experiment Summary
+### Test-set decoding (`marathi_test`)
 
-| Model | Token | Epochs | Train Acc (%) | Val Loss (%) | **WER (%)** | **CER (%)** |
-|:--|:--:|--:|--:|--:|--:|--:|
-| **Char Conformer** | Char | 31 / 30 | 98.3 | 47.75 | **45.2** | **22.0** |
-| **BPE-150 Conformer** | BPE-150 | 10 / 30 | 96.8 | 52.962 | **90.1** | **26.5** |
-| **BPE-2000 Conformer** | BPE-2000 | 25 / 30 | 99.6 | 53.6 | **89.2** | **42.1** |
-| **XLSR-Conformer (BPE-2000)** | BPE-2000 | 22 / 60 | 97.8 | 66.832 | **99.2** | **51.0** |
-| **XLSR-Conformer (Char)** | Char | 13 / 60 | 82.4 | 75.155 | **78.7** | **43.3** |
+Beam **20**, **CTC weight 0.5** unless noted.
+
+#### Beam 20, CTC 0.5 (no LM)
+
+|        | Corr | Sub | Del | Ins | Err | S.Err |
+|--------|-----:|----:|----:|----:|----:|------:|
+| **CER** | 88.9 | 7.1 | 4.0 | 1.9 | 13.0 | 77.7 |
+| **WER** | 73.8 | 23.8 | 2.4 | 3.2 | 29.4 | 78.5 |
+
+#### Beam 20, CTC 0.5, LM weight 0.3
+
+|        | Corr | Sub | Del | Ins | Err | S.Err |
+|--------|-----:|----:|----:|----:|----:|------:|
+| **CER** | 89.0 | 6.6 | 4.4 | 1.7 | 12.6 | 74.3 |
+| **WER** | 76.0 | 21.6 | 2.4 | 3.0 | 27.0 | 75.0 |
 
 ---
 
-### Notes
-- The **Char Conformer** achieved the lowest validation loss (47.75) and best generalization.
-- **BPE conformer** reached high training accuracy but tended to overfit.
-- **XLSR + conformer (BPE and Char)** underperformed in this setup, likely due to limited fine-tuning (also sub-sampling conv2d was disabled. I used linear for this.)
-All the above training was done without any LM model.
+### Dataset reference
 
----
-
-### Dataset Reference
-> P. Jyothi et al., *“IndicCorpora: A Large Multilingual Corpus for Indic Languages.”*
-> [IIT Bombay IndicCorpora Project – Marathi](https://www.cse.iitb.ac.in/~pjyothi/indiccorpora/#marathi)
+> P. Jyothi et al., *“IndicCorpora: A Large Multilingual Corpus for Indic Languages.”*  
+> [IIT Bombay IndicCorpora — Marathi](https://www.cse.iitb.ac.in/~pjyothi/indiccorpora/#marathi)
