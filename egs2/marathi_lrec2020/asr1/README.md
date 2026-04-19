@@ -18,7 +18,7 @@ Recipe for **Marathi** ASR on the
 
 Training uses **`conf/train_asr_transformer.yaml`** (character Conformer: 3 blocks, 256-dim encoder, `batch_bins: 16000000`, `accum_grad: 4`, Adam `lr: 0.0005`, warmup 20k, SpecAugment, hybrid CTC/attention `ctc_weight: 0.3`).
 
-Decoding without LM: **`conf/decode_asr.yaml`** (`lm_weight: 0.0`).  
+Decoding without LM: **`conf/decode_asr.yaml`** (`lm_weight: 0.0`).
 Decoding with LM (match reported fusion): **`conf/decode_asr_lm.yaml`** (beam 20, `ctc_weight: 0.5`, `lm_weight: 0.3`).
 
 ---
@@ -45,5 +45,5 @@ Beam **20**, **CTC weight 0.5** unless noted.
 
 ### Dataset reference
 
-> P. Jyothi et al., *“IndicCorpora: A Large Multilingual Corpus for Indic Languages.”*  
+> P. Jyothi et al., *“IndicCorpora: A Large Multilingual Corpus for Indic Languages.”*
 > [IIT Bombay IndicCorpora — Marathi](https://www.cse.iitb.ac.in/~pjyothi/indiccorpora/#marathi)
