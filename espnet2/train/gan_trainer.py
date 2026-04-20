@@ -10,7 +10,12 @@ import time
 from typing import Dict, Iterable, List, Optional, Sequence, Tuple
 
 import torch
-from torch.amp import GradScaler, autocast
+from torch.amp import autocast
+
+try:
+    from torch.amp import GradScaler
+except ImportError:
+    from torch.cuda.amp import GradScaler
 from torch.nn.parallel import DistributedDataParallel as DDP
 from typeguard import typechecked
 

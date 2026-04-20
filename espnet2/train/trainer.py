@@ -13,7 +13,12 @@ import numpy as np
 import torch
 import torch.nn
 import torch.optim
-from torch.amp import GradScaler, autocast
+from torch.amp import autocast
+
+try:
+    from torch.amp import GradScaler
+except ImportError:
+    from torch.cuda.amp import GradScaler
 from typeguard import typechecked
 
 from espnet2.iterators.abs_iter_factory import AbsIterFactory
