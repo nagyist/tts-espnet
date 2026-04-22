@@ -91,26 +91,28 @@ def pytest_configure():
         _install_stub("deepspeed", ds)
 
     # ---- wandb shim ----
-    # Real wandb is importable, but `wandb.init()` expects credentials /
-    # local state. Replace only after the real module fails — keep real
-    # wandb if it somehow got past the check (e.g. someone pre-installed
-    # it and wants integration testing).
-    if "wandb" not in sys.modules:
-        wandb = _make_module("wandb")
+    # Real wandb is installed via ``espnet[speechlm]``, but its APIs
+    # (config.update, log) refuse to run until wandb.init() has been
+    # called, and wandb.init without credentials would either block on
+    # login or emit real run metadata we don't want in CI. Force-override
+    # sys.modules so test code always sees the no-op stub — this runs
+    # before any test module imports the trainer, so the replacement
+    # sticks.
+    wandb = _make_module("wandb")
 
-        class _MockRun:
+    class _MockRun:
+        pass
+
+    class _MockConfig:
+        def update(self, d):
             pass
 
-        class _MockConfig:
-            def update(self, d):
-                pass
-
-        wandb.run = _MockRun()
-        wandb.config = _MockConfig()
-        wandb.log = lambda data, step=None: None
-        wandb.init = lambda *a, **k: _MockRun()
-        wandb.finish = lambda *a, **k: None
-        _install_stub("wandb", wandb)
+    wandb.run = _MockRun()
+    wandb.config = _MockConfig()
+    wandb.log = lambda data, step=None: None
+    wandb.init = lambda *a, **k: _MockRun()
+    wandb.finish = lambda *a, **k: None
+    sys.modules["wandb"] = wandb
 
     # ---- torchtitan fallback shim ----
     # ``torchtitan`` is listed in ``espnet[speechlm]`` and CI installs it
