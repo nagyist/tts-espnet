@@ -1,15 +1,26 @@
-"""Dependency stubs for espnet2/speechlm/trainer tests.
+"""Dependency shims for espnet2/speechlm/trainer tests.
 
-Injects lightweight stubs for heavy optional dependencies (deepspeed,
-wandb, humanfriendly, torchtitan, parallel_utils) so that tests can run
-in CI without those packages. The real packages are used when available.
+Where possible we import the real package. Two categories need shims:
+
+1. **wandb** — real wandb is installable, but `wandb.init()` contacts a
+   remote service or local state that isn't present in CI. We stub it so
+   tests don't need credentials or network.
+
+2. **deepspeed** — not part of ``espnet[speechlm]`` (and not part of base
+   deps). DeepSpeed is GPU-oriented and heavy, so CI doesn't install it.
+
+3. **``espnet2.speechlm.model.speechlm.parallel_utils``** — this package
+   is being added in a separate PR and isn't present on the PR's base
+   branch. A stub keeps imports working until that PR lands.
+
+Everything else (humanfriendly, torchtitan, transformers, ...) is
+imported as the real package so version mismatches are caught by tests.
 """
 
 import importlib.machinery
 import sys
 import types
 
-import torch
 import torch.nn as nn
 
 
@@ -24,12 +35,13 @@ def _make_module(name):
 
 
 def pytest_configure():
-    """Inject stubs before any test module is collected."""
+    """Inject shims that are genuinely needed for CPU-only CI."""
 
-    # ---- deepspeed stub ----
+    # ---- deepspeed shim ----
+    # Not in `espnet[speechlm]` and not a base dep. Tests of the
+    # DeepSpeedTrainer pathway mock the engine interface below.
     if "deepspeed" not in sys.modules:
-        ds = types.ModuleType("deepspeed")
-        ds.__spec__ = importlib.machinery.ModuleSpec("deepspeed", loader=None)
+        ds = _make_module("deepspeed")
 
         def initialize(model=None, model_parameters=None, config=None, **kwargs):
             class _MockEngine(nn.Module):
@@ -78,10 +90,13 @@ def pytest_configure():
         ds.initialize = initialize
         _install_stub("deepspeed", ds)
 
-    # ---- wandb stub ----
+    # ---- wandb shim ----
+    # Real wandb is importable, but `wandb.init()` expects credentials /
+    # local state. Replace only after the real module fails — keep real
+    # wandb if it somehow got past the check (e.g. someone pre-installed
+    # it and wants integration testing).
     if "wandb" not in sys.modules:
-        wandb = types.ModuleType("wandb")
-        wandb.__spec__ = importlib.machinery.ModuleSpec("wandb", loader=None)
+        wandb = _make_module("wandb")
 
         class _MockRun:
             pass
@@ -92,58 +107,42 @@ def pytest_configure():
 
         wandb.run = _MockRun()
         wandb.config = _MockConfig()
-
-        def log(data, step=None):
-            pass
-
-        def init(*args, **kwargs):
-            return _MockRun()
-
-        def finish(*args, **kwargs):
-            return None
-
-        wandb.log = log
-        wandb.init = init
-        wandb.finish = finish
+        wandb.log = lambda data, step=None: None
+        wandb.init = lambda *a, **k: _MockRun()
+        wandb.finish = lambda *a, **k: None
         _install_stub("wandb", wandb)
 
-    # ---- humanfriendly stub ----
-    if "humanfriendly" not in sys.modules:
-        humanfriendly = types.ModuleType("humanfriendly")
-        humanfriendly.__spec__ = importlib.machinery.ModuleSpec(
-            "humanfriendly", loader=None
-        )
-
-        def format_size(num_bytes, **kwargs):
-            return f"{num_bytes} bytes"
-
-        humanfriendly.format_size = format_size
-        _install_stub("humanfriendly", humanfriendly)
-
-    # ---- torchtitan stub ----
-    # TitanTrainer imports `from torchtitan.distributed import utils as dist_utils`
-    # and calls `dist_utils.clip_grad_norm_`. In CI we don't need a real impl
-    # since the methods that call clip_grad_norm_ run only on GPU+dist.
+    # ---- torchtitan fallback shim ----
+    # ``torchtitan`` is listed in ``espnet[speechlm]`` and CI installs it
+    # as a real package. The fallback shim only activates in environments
+    # where the user opted out of the speechlm extra — so version errors
+    # in real torchtitan still surface in CI.
     if "torchtitan" not in sys.modules:
-        tt = _make_module("torchtitan")
-        tt_dist = _make_module("torchtitan.distributed")
-        tt_dist_utils = _make_module("torchtitan.distributed.utils")
+        try:
+            import torchtitan  # noqa: F401
+            from torchtitan.distributed import utils as _tt_utils  # noqa: F401
+        except Exception:
+            tt = _make_module("torchtitan")
+            tt_dist = _make_module("torchtitan.distributed")
+            tt_dist_utils = _make_module("torchtitan.distributed.utils")
 
-        def _stub_clip_grad_norm_(parameters, max_norm, **kwargs):
-            return torch.tensor(0.0)
+            import torch as _torch
 
-        tt_dist_utils.clip_grad_norm_ = _stub_clip_grad_norm_
-        tt_dist.utils = tt_dist_utils
-        tt.distributed = tt_dist
-        _install_stub("torchtitan", tt)
-        _install_stub("torchtitan.distributed", tt_dist)
-        _install_stub("torchtitan.distributed.utils", tt_dist_utils)
+            def _stub_clip_grad_norm_(parameters, max_norm, **kwargs):
+                return _torch.tensor(0.0)
 
-    # ---- espnet2.speechlm.model.speechlm.parallel_utils stub ----
-    # The real parallel_utils package lives on a separate feature branch and
-    # may not be present on this branch. TitanTrainer imports
-    # `init_parallel_dims`, `parallel_strategies`, `build_pipeline` from it
-    # at module load time.
+            tt_dist_utils.clip_grad_norm_ = _stub_clip_grad_norm_
+            tt_dist.utils = tt_dist_utils
+            tt.distributed = tt_dist
+            _install_stub("torchtitan", tt)
+            _install_stub("torchtitan.distributed", tt_dist)
+            _install_stub("torchtitan.distributed.utils", tt_dist_utils)
+
+    # ---- parallel_utils shim ----
+    # ``espnet2.speechlm.model.speechlm.parallel_utils`` is being added in
+    # a separate PR. When it's absent or is merely a namespace-package
+    # placeholder (leftover pyc dir without __init__.py), install a
+    # lightweight stub so TitanTrainer can still be imported.
     pu_name = "espnet2.speechlm.model.speechlm.parallel_utils"
     _real_pu = None
     try:
@@ -152,8 +151,6 @@ def pytest_configure():
     except Exception:
         _real_pu = None
 
-    # Install stub when the real package is missing OR is a namespace-package
-    # placeholder (missing init_parallel_dims means it's not the real impl).
     if _real_pu is None or not hasattr(_real_pu, "init_parallel_dims"):
         pu = _make_module(pu_name)
 

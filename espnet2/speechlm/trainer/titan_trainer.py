@@ -249,7 +249,22 @@ class TitanTrainer:
         )
 
     def _build_optimizer_scheduler(self):
-        """Create optimizer and LR scheduler after parallelization."""
+        """Create optimizer and LR scheduler after parallelization.
+
+        The only LR schedule supported is linear warmup → cosine decay →
+        constant floor. This is the mainstream default in modern LLM
+        training (GPT-3, LLaMA, Qwen, etc.) and is sufficient for virtually
+        all SpeechLM training recipes, so we hard-code it here to keep the
+        config surface small. Configurable knobs on ``trainer.lr_scheduler``:
+
+        - ``warmup_steps`` (default 1000): linear ramp 0 → peak_lr.
+        - ``decay_end_step`` (default ``trainer.max_step``): step at which
+          cosine decay finishes and the LR holds at the floor.
+        - ``min_lr_ratio`` (default 0.0): floor as a fraction of peak_lr.
+
+        If a future recipe needs a different schedule (e.g. inverse-sqrt
+        for encoder-decoder ASR), subclass this method.
+        """
         opt_config = self.trainer_args.get("optimizer", {})
         lr_config = self.trainer_args.get("lr_scheduler", {})
 

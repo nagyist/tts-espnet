@@ -119,6 +119,23 @@ spk = [
   "asteroid_filterbanks==0.4.0"
 ]
 
+# Extras needed for SpeechLM training (espnet2/speechlm).
+# Contains only packages not already in the base "dependencies" above.
+# GPU-only runtime deps (torchtitan, liger-kernel) are listed here so that
+# `pip install espnet[speechlm]` pulls them, but they are not imported at
+# module load time in the hot path, so CPU-only installs still succeed.
+speechlm = [
+  "psutil",
+  "transformers==4.57.1",
+  "huggingface-hub",
+  "joblib",
+  "wandb",
+  "polars",
+  "duckdb",
+  "torchtitan",
+  "liger-kernel",
+]
+
 dev = [
   "black",
   "flake8>=3.7.8",
@@ -157,7 +174,7 @@ all = [
   "espnet[tts]",
   "espnet[enh]",
   "espnet[spk]",
+  "espnet[speechlm]",
   "fairscale",
-  "transformers",
   "evaluate",
 ]
