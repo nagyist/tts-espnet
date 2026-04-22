@@ -55,6 +55,7 @@ dependencies = [
     "dask_jobqueue",
     "torch>=2.3.1",
     "torchaudio>=2.3.1",
+    "wandb",
 ]
 
 [project.urls]
@@ -129,7 +130,6 @@ speechlm = [
   "transformers==4.57.1",
   "huggingface-hub",
   "joblib",
-  "wandb",
   "polars",
   "duckdb",
   # torchtitan (distributed training) and liger-kernel (CUDA Triton
