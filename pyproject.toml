@@ -132,8 +132,12 @@ speechlm = [
   "wandb",
   "polars",
   "duckdb",
-  "torchtitan",
-  "liger-kernel",
+  # torchtitan (distributed training) and liger-kernel (CUDA Triton
+  # kernels) are Linux+CUDA only. Leave them off Windows/macOS so
+  # `pip install espnet[all]` doesn't spend minutes backtracking
+  # through incompatible versions and then fail.
+  "torchtitan; sys_platform == 'linux'",
+  "liger-kernel; sys_platform == 'linux'",
 ]
 
 dev = [
