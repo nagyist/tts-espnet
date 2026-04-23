@@ -1,20 +1,20 @@
-"""Dependency stubs for espnet2/speechlm/model tests.
+"""Collection gate for espnet2/speechlm/model tests.
 
-Injects lightweight stubs for heavy optional dependencies (transformers,
-joblib, humanfriendly) so that tests can run in CI without those packages.
+``espnet2/speechlm/model/__init__.py`` eagerly imports
+``SpeechLMJobTemplate`` → ``lm/parallel.py`` → ``lm/loss.py``, and
+``lm/loss.py`` imports ``liger_kernel`` at module-load time.
+``liger_kernel`` is listed in the ``espnet[speechlm]`` extra but is
+optional in the base install. When it (or its fused-CE submodule) is
+not importable, the whole model subtree would fail at collection; we
+``collect_ignore_glob`` it instead so the rest of the test suite keeps
+running.
 
-Additionally, ``liger_kernel`` (required by ``lm/loss.py``, which is
-imported eagerly by ``espnet2/speechlm/model/__init__.py``) is not a
-project dep. When its fused-CE submodule is not importable, we
-collect-ignore this entire subtree so the cascading import failure in
-``espnet2.speechlm.model.__init__`` does not break the wider test run.
+No other stubs here. Heavy deps (``transformers``, ``joblib``,
+``humanfriendly``) are real packages in CI, so we use them directly.
+Per-test monkeypatching of, e.g., ``transformers.AutoConfig`` lives in
+the test files themselves so that a global patch can never leak into
+unrelated tests.
 """
-
-import importlib.machinery
-import sys
-import types
-
-import torch.nn as nn
 
 
 def _liger_fused_ce_importable():
@@ -34,138 +34,3 @@ if not _liger_fused_ce_importable():
     # only walks two separate match passes (same-dir / nested), so we list
     # both patterns explicitly.
     collect_ignore_glob = ["*.py", "*/*.py", "*/*/*.py"]
-
-
-def _install_stub(name, module):
-    sys.modules.setdefault(name, module)
-
-
-def pytest_configure():
-    """Inject stubs before any test module is collected."""
-
-    # ---- transformers stub ----
-    if "transformers" not in sys.modules:
-        transformers = types.ModuleType("transformers")
-        transformers.__spec__ = importlib.machinery.ModuleSpec(
-            "transformers", loader=None
-        )
-
-        # AutoConfig
-        class _MockConfig:
-            architectures = ["MockModel"]
-            vocab_size = 100
-            hidden_size = 64
-
-        class AutoConfig:
-            @staticmethod
-            def from_pretrained(*args, **kwargs):
-                return _MockConfig()
-
-        transformers.AutoConfig = AutoConfig
-
-        # AutoTokenizer
-        class AutoTokenizer:
-            @staticmethod
-            def from_pretrained(*args, **kwargs):
-                return AutoTokenizer()
-
-            def __call__(self, text, **kwargs):
-                return {"input_ids": [0]}
-
-        transformers.AutoTokenizer = AutoTokenizer
-
-        # AutoModelForCausalLM (used by parallel_pp.py's _empty_init).
-        class AutoModelForCausalLM:
-            @staticmethod
-            def from_config(config):
-                # Empty-init path is distributed-only and not unit-tested;
-                # return the bare MockModel so the import resolves.
-                return transformers.MockModel(config)
-
-        transformers.AutoModelForCausalLM = AutoModelForCausalLM
-
-        # cache_utils
-        cache_utils = types.ModuleType("transformers.cache_utils")
-        cache_utils.__spec__ = importlib.machinery.ModuleSpec(
-            "transformers.cache_utils", loader=None
-        )
-
-        class DynamicCache:
-            def __init__(self):
-                self.layers = []
-
-        cache_utils.DynamicCache = DynamicCache
-        transformers.cache_utils = cache_utils
-
-        # MockModel (minimal HF-style nn.Module)
-        class _MockInnerModel(nn.Module):
-            def __init__(self, config):
-                super().__init__()
-                self.embed_tokens = nn.Embedding(config.vocab_size, config.hidden_size)
-
-            def forward(self, inputs_embeds=None, position_ids=None, **kwargs):
-                class _Out:
-                    pass
-
-                out = _Out()
-                out.last_hidden_state = inputs_embeds
-                out.past_key_values = None
-
-                def get(key, default=None):
-                    return default
-
-                out.get = get
-                return out
-
-        class MockModel(nn.Module):
-            config_class = _MockConfig
-
-            def __init__(self, config=None):
-                super().__init__()
-                if config is None:
-                    config = _MockConfig()
-                self.config = config
-                self.model = _MockInnerModel(config)
-                self.lm_head = nn.Linear(
-                    config.hidden_size, config.vocab_size, bias=False
-                )
-
-            @classmethod
-            def from_pretrained(cls, *args, **kwargs):
-                config = _MockConfig()
-                return cls(config)
-
-        transformers.MockModel = MockModel
-
-        _install_stub("transformers", transformers)
-        _install_stub("transformers.cache_utils", cache_utils)
-
-    # ---- joblib stub ----
-    if "joblib" not in sys.modules:
-        joblib = types.ModuleType("joblib")
-        joblib.__spec__ = importlib.machinery.ModuleSpec("joblib", loader=None)
-
-        class _MockKMeans:
-            def predict(self, x):
-                import numpy as np
-
-                return np.zeros(len(x), dtype=int)
-
-        def load(*args, **kwargs):
-            return _MockKMeans()
-
-        joblib.load = load
-        _install_stub("joblib", joblib)
-
-    # ---- humanfriendly stub ----
-    if "humanfriendly" not in sys.modules:
-        humanfriendly = types.ModuleType("humanfriendly")
-        humanfriendly.__spec__ = importlib.machinery.ModuleSpec(
-            "humanfriendly", loader=None
-        )
-
-        def format_size(num_bytes, **kwargs):
-            return f"{num_bytes} bytes"
-
-        humanfriendly.format_size = format_size
-        _install_stub("humanfriendly", humanfriendly)

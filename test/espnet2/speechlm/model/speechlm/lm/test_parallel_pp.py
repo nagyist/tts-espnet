@@ -18,8 +18,6 @@ The whole file is skipped (via the ``test/espnet2/speechlm/model/``
 (transitive via ``parallel.py`` → ``loss.py``).
 """
 
-from unittest.mock import patch
-
 import pytest
 import torch
 import torch.nn as nn
@@ -66,22 +64,21 @@ class _MockHFModel(nn.Module):
 
 
 @pytest.fixture(autouse=True)
-def _patch_transformers():
-    """Patch transformers just enough for ``build_parallel_pp_hf_class``."""
+def _patch_transformers(monkeypatch):
+    """Patch transformers for ``build_parallel_pp_hf_class`` via monkeypatch.
+
+    Routes every mutation through pytest's ``monkeypatch`` so teardown
+    is guaranteed and global state cannot leak into unrelated tests.
+    """
     import transformers
 
-    old = getattr(transformers, "MockModel", None)
-    transformers.MockModel = _MockHFModel
-    with patch.object(
+    monkeypatch.setattr(transformers, "MockModel", _MockHFModel, raising=False)
+    monkeypatch.setattr(
         transformers.AutoConfig,
         "from_pretrained",
-        return_value=_MockConfig(),
-    ):
-        yield
-    if old is None:
-        delattr(transformers, "MockModel")
-    else:
-        transformers.MockModel = old
+        staticmethod(lambda *a, **kw: _MockConfig()),
+    )
+    yield
 
 
 # ---------------------------------------------------------------------------

@@ -11,8 +11,6 @@ skipped (via the sibling ``conftest.py``'s ``collect_ignore_glob``)
 when ``liger_kernel.ops.fused_linear_cross_entropy`` is not importable.
 """
 
-from unittest.mock import patch
-
 import numpy as np
 import pytest
 import torch
@@ -88,30 +86,37 @@ class _FakeLigerFn:
 
 @pytest.fixture(autouse=True)
 def _patch_transformers_and_liger(monkeypatch):
-    """Patch transformers + Liger kernel for CPU tests."""
+    """Patch transformers + Liger kernel for CPU tests.
+
+    Uses pytest's ``monkeypatch`` for every mutation so the cleanup is
+    guaranteed (including on test failure). We intentionally do NOT
+    use ``patch.object`` + ``with`` here: bare attribute mutations on
+    the real ``transformers`` module have leaked into unrelated tests
+    in CI; routing everything through ``monkeypatch`` makes the scope
+    strictly per-test.
+    """
     import transformers
 
-    old = getattr(transformers, "MockModel", None)
-    transformers.MockModel = _MockHFModel
+    # Register a fresh mock architecture class under `transformers.MockModel`
+    # so `build_parallel_hf_class("mock-model")` can find it via getattr.
+    monkeypatch.setattr(transformers, "MockModel", _MockHFModel, raising=False)
 
+    # Return a fresh `_MockConfig` per call — don't share one instance with
+    # every caller, and don't leak it into a long-lived mock's return_value.
+    monkeypatch.setattr(
+        transformers.AutoConfig,
+        "from_pretrained",
+        staticmethod(lambda *a, **kw: _MockConfig()),
+    )
+
+    # Real Liger kernel runs on GPU only; swap in a deterministic CPU stub.
     monkeypatch.setattr(
         "espnet2.speechlm.model.speechlm.lm.loss."
         "LigerFusedLinearCrossEntropyFunction",
         _FakeLigerFn,
     )
     _FakeLigerFn.calls.clear()
-
-    with patch.object(
-        transformers.AutoConfig,
-        "from_pretrained",
-        return_value=_MockConfig(),
-    ):
-        yield
-
-    if old is None:
-        delattr(transformers, "MockModel")
-    else:
-        transformers.MockModel = old
+    yield
 
 
 # ---------------------------------------------------------------------------
