@@ -7,13 +7,13 @@ from espnet3.systems.base.inference_runner import InferenceRunner
 
 
 def _output_fn(*, data, model_output, idx):
-    return {"utt_id": data["uttid"], "hyp": model_output[0][0], "ref": data["text"]}
+    return {"utt_id": data["utt_id"], "hyp": model_output[0][0], "ref": data["text"]}
 
 
 def _batch_output_fn(*, data, model_output, idx):
     return [
         {
-            "utt_id": sample["uttid"],
+            "utt_id": sample["utt_id"],
             "hyp": output[0][0],
             "ref": sample["text"],
         }
@@ -22,7 +22,7 @@ def _batch_output_fn(*, data, model_output, idx):
 
 
 def _param_output_fn(*, data, model_output, idx):
-    return {"utt_id": data["uttid"], "hyp": model_output, "ref": "ref"}
+    return {"utt_id": data["utt_id"], "hyp": model_output, "ref": "ref"}
 
 
 class DummyProvider(InferenceProvider):
@@ -47,17 +47,31 @@ class ParamRunner(InferenceRunner):
 
 
 def test_build_dataset_uses_test_set(monkeypatch):
-    cfg = OmegaConf.create({"dataset": {"_target_": "dummy"}, "test_set": "dev"})
-    organizer = type("Org", (), {"test": {"dev": ["item"]}})()
+    cfg = OmegaConf.create(
+        {
+            "dataset": {
+                "_target_": "espnet3.components.data.data_organizer.DataOrganizer",
+                "test": [
+                    {
+                        "name": "dev",
+                        "data_src": "mini_an4/asr",
+                        "data_src_args": {"split": "dev"},
+                    }
+                ],
+            },
+            "test_set": "dev",
+        }
+    )
     calls = {}
+    organizer = type("Org", (), {"test": {"dev": ["item"]}})()
+
+    import espnet3.systems.base.inference_provider as provider_mod
 
     def fake_instantiate(obj):
         calls["obj"] = obj
         return organizer
 
-    monkeypatch.setattr(
-        "espnet3.systems.base.inference_provider.instantiate", fake_instantiate
-    )
+    monkeypatch.setattr(provider_mod, "instantiate", fake_instantiate)
 
     dataset = InferenceProvider.build_dataset(cfg)
 
@@ -105,7 +119,7 @@ def test_build_model_cuda_uses_visible_device(monkeypatch):
 
 
 def test_forward_returns_hyp_and_ref():
-    dataset = [{"uttid": "utt1", "speech": "audio", "text": "ref"}]
+    dataset = [{"utt_id": "utt1", "speech": "audio", "text": "ref"}]
 
     class DummyModel:
         def __call__(self, speech):
@@ -124,10 +138,28 @@ def test_forward_returns_hyp_and_ref():
     assert out == {"utt_id": "utt1", "hyp": "hyp", "ref": "ref"}
 
 
+def test_forward_without_output_fn_returns_raw_model_output():
+    dataset = [{"utt_id": "utt1", "speech": "audio", "text": "ref"}]
+
+    class DummyModel:
+        def __call__(self, speech):
+            assert speech == "audio"
+            return {"utt_id": "utt1", "hyp": "hyp"}
+
+    out = InferenceRunner.forward(
+        0,
+        dataset=dataset,
+        model=DummyModel(),
+        input_key="speech",
+    )
+
+    assert out == {"utt_id": "utt1", "hyp": "hyp"}
+
+
 def test_forward_batch_with_batched_inputs():
     dataset = [
-        {"uttid": "utt1", "speech": "audio1", "text": "ref1"},
-        {"uttid": "utt2", "speech": "audio2", "text": "ref2"},
+        {"utt_id": "utt1", "speech": "audio1", "text": "ref1"},
+        {"utt_id": "utt2", "speech": "audio2", "text": "ref2"},
     ]
 
     class DummyModel:
@@ -152,8 +184,8 @@ def test_forward_batch_with_batched_inputs():
 
 def test_forward_batch_requires_batched_model():
     dataset = [
-        {"uttid": "utt1", "speech": "audio1", "text": "ref1"},
-        {"uttid": "utt2", "speech": "audio2", "text": "ref2"},
+        {"utt_id": "utt1", "speech": "audio1", "text": "ref1"},
+        {"utt_id": "utt2", "speech": "audio2", "text": "ref2"},
     ]
 
     class DummyModel:
@@ -182,7 +214,7 @@ def test_forward_requires_fields():
             output_fn_path=f"{__name__}._output_fn",
         )
 
-    dataset = [{"uttid": "utt1", "speech": "audio"}]
+    dataset = [{"utt_id": "utt1", "speech": "audio"}]
     with pytest.raises(KeyError, match="text"):
         InferenceRunner.forward(
             0,
@@ -215,7 +247,7 @@ def test_inference_params_affect_runner_forward(tmp_path, flip, expected):
             "inference_dir": str(tmp_path),
             "dataset": {
                 "test": [{"name": "test"}],
-                "data": [{"uttid": "utt1", "speech": "s1"}],
+                "data": [{"utt_id": "utt1", "speech": "s1"}],
             },
             "input_key": "speech",
             "output_fn": f"{__name__}._param_output_fn",

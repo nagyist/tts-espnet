@@ -1,0 +1,26 @@
+##########################################################
+#                 METRIC SCORING SETTING                 #
+##########################################################
+# Quick usage:
+#   python run.py --stages measure --metrics_config conf/metrics.yaml
+#
+# Notes:
+# - Metrics checks all directories under `${inference_dir}`.
+# - Each discovered directory is treated as one evaluation target.
+#
+##########################################################
+#                    PATHS AND INPUTS                    #
+##########################################################
+inference_dir: ${exp_dir}/inference
+
+##########################################################
+#                    METRIC DEFINITION                   #
+##########################################################
+metrics:
+  - metric:
+      _target_: espnet3.systems.asr.metrics.wer.WER
+      clean_types:
+
+  - metric:
+      _target_: espnet3.systems.asr.metrics.cer.CER
+      clean_types:

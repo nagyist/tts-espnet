@@ -11,7 +11,6 @@ from espnet3.utils.config_utils import (
     load_config_with_defaults,
     load_default_config,
     load_line,
-    load_yaml,
 )
 
 # ===============================================================
@@ -250,47 +249,6 @@ foo: bar
     assert "defaults" not in cfg
 
 
-def test_load_yaml_relative_path_survives_merge(write_yaml):
-    write_yaml(
-        "conf/training.yaml",
-        """
-exp_dir: ./exp/train_debug
-dataset_dir: ./data/mini_an4
-""",
-    )
-    path = write_yaml(
-        "conf/inference.yaml",
-        """
-exp_dir: ${load_yaml:training.yaml,exp_dir}
-dataset_dir: ${load_yaml:training.yaml,dataset_dir}
-""",
-    )
-    cfg = load_config_with_defaults(str(path))
-    merged = OmegaConf.merge(OmegaConf.create({"provider": {"name": "dummy"}}), cfg)
-
-    assert merged.exp_dir == "./exp/train_debug"
-    assert merged.dataset_dir == "./data/mini_an4"
-
-
-def test_load_yaml_quoted_relative_path_with_spaces(write_yaml):
-    write_yaml(
-        "conf dir/training config.yaml",
-        """
-exp_tag: train_debug
-""",
-    )
-    path = write_yaml(
-        "conf dir/inference.yaml",
-        """
-exp_tag: ${load_yaml:"training config.yaml",exp_tag}
-""",
-    )
-
-    cfg = load_config_with_defaults(str(path))
-
-    assert cfg.exp_tag == "train_debug"
-
-
 def test_missing_file_raises(tmp_path):
     """Test that loading a config with a missing file in `defaults`
 
@@ -325,36 +283,6 @@ defaults:
         load_config_with_defaults(str(main_path))
 
 
-def test_load_yaml_full_config(write_yaml):
-    path = write_yaml(
-        "config.yaml",
-        """
-foo:
-  bar: 123
-""",
-    )
-    cfg = load_yaml(str(path))
-    assert cfg.foo.bar == 123
-
-
-def test_load_yaml_nested_key(write_yaml):
-    path = write_yaml(
-        "config.yaml",
-        """
-foo:
-  bar: 123
-""",
-    )
-    value = load_yaml(str(path), "foo.bar")
-    assert value == 123
-
-
-def test_load_yaml_missing_key_raises(write_yaml):
-    path = write_yaml("config.yaml", "foo: 1\n")
-    with pytest.raises(KeyError):
-        load_yaml(str(path), "missing.key")
-
-
 def test_load_default_config_train():
     cfg = load_default_config("training.yaml", "egs3.TEMPLATE.asr")
     assert "dataset" in cfg
@@ -363,6 +291,40 @@ def test_load_default_config_train():
 
 def test_load_and_merge_config_none():
     assert load_and_merge_config(None, "metrics.yaml") is None
+
+
+def test_load_and_merge_config_resolve_false_preserves_interpolations(
+    write_yaml, monkeypatch
+):
+    template = write_yaml(
+        "template.yaml",
+        """
+exp_dir: ./exp/from_template
+custom_dir: ${exp_dir}/custom
+""",
+    )
+    user = write_yaml(
+        "user.yaml",
+        """
+custom_path: ${exp_dir}/artifacts
+""",
+    )
+
+    monkeypatch.setattr(
+        "espnet3.utils.config_utils.load_default_config",
+        lambda _, __: load_config_with_defaults(str(template), resolve=False),
+    )
+
+    cfg = load_and_merge_config(
+        user,
+        "training.yaml",
+        default_package="dummy.package",
+        resolve=False,
+    )
+
+    unresolved = OmegaConf.to_container(cfg, resolve=False)
+    assert unresolved["custom_dir"] == "${exp_dir}/custom"
+    assert unresolved["custom_path"] == "${exp_dir}/artifacts"
 
 
 def test_load_and_merge_config_resolves_user_reference_to_template_value(
