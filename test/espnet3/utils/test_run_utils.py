@@ -2,6 +2,7 @@ import logging
 
 import pytest
 from omegaconf import OmegaConf
+from omegaconf.errors import InterpolationKeyError
 
 from espnet3.utils.run_utils import (
     apply_training_experiment_context,
@@ -80,6 +81,79 @@ def test_apply_training_experiment_context_noop_without_training() -> None:
     assert inference.exp_dir == "./exp/standalone_eval"
 
 
+def test_apply_training_experiment_context_updates_metrics_config(caplog) -> None:
+    training = OmegaConf.create(
+        {
+            "exp_tag": "train_debug",
+            "exp_dir": "./exp/train_debug",
+        }
+    )
+    metrics = OmegaConf.create({"metrics_dir": "${exp_dir}/metrics"})
+
+    with caplog.at_level(logging.INFO):
+        apply_training_experiment_context(
+            training_config=training,
+            inference_config=None,
+            metrics_config=metrics,
+            log=logging.getLogger("test.run_utils"),
+        )
+
+    assert metrics.exp_tag == "train_debug"
+    assert metrics.exp_dir == "./exp/train_debug"
+    assert "Inserted metrics_config.exp_tag from training_config" in caplog.text
+    assert "Inserted metrics_config.exp_dir from training_config" in caplog.text
+
+
+def test_apply_training_experiment_context_skips_missing_or_same_values(
+    caplog,
+) -> None:
+    training = OmegaConf.create({"exp_tag": "train_debug"})
+    inference = OmegaConf.create(
+        {
+            "exp_tag": "train_debug",
+            "exp_dir": "./exp/custom_eval",
+        }
+    )
+
+    with caplog.at_level(logging.INFO):
+        apply_training_experiment_context(
+            training_config=training,
+            inference_config=inference,
+            metrics_config=None,
+            log=logging.getLogger("test.run_utils"),
+        )
+
+    assert inference.exp_tag == "train_debug"
+    assert inference.exp_dir == "./exp/custom_eval"
+    assert "Inserted inference_config.exp_tag from training_config" not in caplog.text
+    assert "Inserted inference_config.exp_dir from training_config" not in caplog.text
+    assert "Overriding inference_config.exp_tag" not in caplog.text
+    assert "Overriding inference_config.exp_dir" not in caplog.text
+
+
+def test_apply_training_experiment_context_skips_empty_source_values(caplog) -> None:
+    training = OmegaConf.create(
+        {
+            "exp_tag": "train_debug",
+            "exp_dir": "   ",
+        }
+    )
+    inference = OmegaConf.create({})
+
+    with caplog.at_level(logging.INFO):
+        apply_training_experiment_context(
+            training_config=training,
+            inference_config=inference,
+            metrics_config=None,
+            log=logging.getLogger("test.run_utils"),
+        )
+
+    assert inference.exp_tag == "train_debug"
+    assert "exp_dir" not in inference
+    assert "Inserted inference_config.exp_tag from training_config" in caplog.text
+    assert "Inserted inference_config.exp_dir from training_config" not in caplog.text
+
+
 def test_validate_experiment_context_accepts_standalone_inference() -> None:
     validate_experiment_context(
         training_config=None,
@@ -118,6 +192,25 @@ def test_validate_experiment_context_accepts_training_backed_inference() -> None
     )
 
 
+def test_validate_experiment_context_accepts_standalone_metrics_by_exp_dir() -> None:
+    validate_experiment_context(
+        training_config=None,
+        inference_config=None,
+        metrics_config=OmegaConf.create({"exp_dir": "./exp/standalone_eval"}),
+        stages_to_run=["measure"],
+    )
+
+
+def test_validate_experiment_context_rejects_non_standalone_metrics() -> None:
+    with pytest.raises(ValueError, match="measure stage requires --training_config"):
+        validate_experiment_context(
+            training_config=None,
+            inference_config=None,
+            metrics_config=OmegaConf.create({"exp_dir": "./exp/None/metrics"}),
+            stages_to_run=["measure"],
+        )
+
+
 def test_resolve_loaded_configs_resolves_interpolations() -> None:
     training = OmegaConf.create(
         {
@@ -137,3 +230,18 @@ def test_resolve_loaded_configs_resolves_interpolations() -> None:
 
     assert training.exp_dir == "./exp/train_debug"
     assert inference.inference_dir == "./exp/train_debug/inference"
+
+
+def test_resolve_loaded_configs_ignores_none_entries() -> None:
+    inference = OmegaConf.create({"inference_dir": "./exp/standalone_eval/inference"})
+
+    resolve_loaded_configs(None, inference)
+
+    assert inference.inference_dir == "./exp/standalone_eval/inference"
+
+
+def test_resolve_loaded_configs_raises_on_missing_interpolation() -> None:
+    inference = OmegaConf.create({"inference_dir": "${exp_dir}/inference"})
+
+    with pytest.raises(InterpolationKeyError):
+        resolve_loaded_configs(inference)
