@@ -11,6 +11,7 @@ from espnet3.components.data.data_organizer import (
 )
 from espnet3.components.data.dataset import (
     CombinedDataset,
+    DatasetWithTransform,
     ShardedDataset,
 )
 
@@ -466,3 +467,103 @@ def test_combined_dataset_sharded_consistency_error():
             transforms=[(DummyTransform(), DummyPreprocessor())] * 2,
             use_espnet_preprocessor=False,
         )
+
+
+def test_combined_dataset_rejects_non_numeric_string_index():
+    combined = CombinedDataset(
+        [DummyDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(ValueError, match="utterance ID to be an integer index"):
+        combined["abc"]
+
+
+def test_combined_dataset_wraps_dataset_access_error():
+    class BrokenDataset:
+        def __init__(self):
+            self.access_count = 0
+
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, idx):
+            self.access_count += 1
+            if self.access_count == 1:
+                return {"audio": b"abc", "text": "hello"}
+            raise KeyError(f"missing {idx}")
+
+    combined = CombinedDataset(
+        [BrokenDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to access dataset at index 0"):
+        combined[0]
+
+
+def test_combined_dataset_rejects_out_of_range_index():
+    combined = CombinedDataset(
+        [DummyDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(IndexError, match="Index out of range in CombinedDataset"):
+        combined[100]
+
+
+def test_combined_dataset_shard_requires_sharded_datasets():
+    combined = CombinedDataset(
+        [DummyDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(RuntimeError, match="All dataset should be the subclass"):
+        combined.shard(0)
+
+
+def test_data_organizer_repr_handles_missing_train_valid_and_multiple_tests():
+    organizer = DataOrganizer(
+        test=[
+            _entry("test_clean"),
+            _entry("test_other", transform=True),
+        ],
+        preprocessor=DummyPreprocessor(),
+    )
+
+    text = repr(organizer)
+
+    assert "train=None" in text
+    assert "valid=None" in text
+    assert "test_clean:" in text
+    assert "test_other:" in text
+
+
+def test_combined_dataset_repr_lists_datasets_and_transforms():
+    combined = CombinedDataset(
+        [DummyDataset(), DummyDataset()],
+        [(DummyTransform(), DummyPreprocessor())] * 2,
+    )
+
+    text = repr(combined)
+
+    assert "CombinedDataset(" in text
+    assert "total_len=4" in text
+    assert "transform=" in text
+    assert "preprocessor=" in text
+
+
+def test_dataset_with_transform_repr_includes_wrapped_components():
+    wrapped = DatasetWithTransform(
+        DummyDataset(),
+        DummyTransform(),
+        DummyPreprocessor(),
+        use_espnet_preprocessor=True,
+    )
+
+    text = repr(wrapped)
+
+    assert "DatasetWithTransform(" in text
+    assert "transform=" in text
+    assert "preprocessor=" in text
+    assert "use_espnet_preprocessor=True" in text

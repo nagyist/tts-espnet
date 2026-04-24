@@ -19,11 +19,15 @@
 #
 # Dataset splits:
 #   test:
+#     - split="valid" from `MiniAn4Dataset`
 #     - split="test" from `MiniAn4Dataset`
 # Notes:
 #   - actual data sources are defined via `${recipe_dir}`
 dataset:
   test:
+    - name: valid
+      data_src_args:
+        split: valid
     - name: test
       data_src_args:
         split: test

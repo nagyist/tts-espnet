@@ -4,6 +4,10 @@
 # Quick usage:
 #   python run.py --stages measure --metrics_config conf/metrics.yaml
 #
+# Notes:
+# - Metrics checks all directories under `${inference_dir}`.
+# - Each discovered directory is treated as one evaluation target.
+#
 ##########################################################
 #                    PATHS AND INPUTS                    #
 ##########################################################
