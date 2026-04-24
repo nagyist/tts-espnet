@@ -14,6 +14,15 @@
 #                    PATHS AND INPUTS                    #
 ##########################################################
 recipe_dir: .
+# Common case:
+# - pass `--training_config`, `--inference_config`, and `--metrics_config`
+# - `run.py` copies `training_config.exp_tag` / `training_config.exp_dir` here
+# - `run.py` also copies `inference_config.inference_dir` here, so `measure`
+#   reads the same directory used by `infer`
+#
+# Standalone `measure` is also supported. In that case, set either `exp_tag` or
+# a concrete `exp_dir` below. Override `inference_dir` only when you want to
+# score a different inference output directory.
 exp_tag:
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 inference_dir: ${exp_dir}/${self_name:}

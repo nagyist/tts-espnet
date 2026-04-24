@@ -1,12 +1,21 @@
 ##########################################################
 #                   Inference SETTING                    #
 ##########################################################
-# Quick usage:
-#   python run.py --stages infer --inference_config conf/inference.yaml
+# Common usage:
+#   python run.py --stages infer \
+#       --training_config conf/training_asr_transducer.yaml \
+#       --inference_config conf/inference_transducer.yaml
 #
 ##########################################################
 #                    PATHS AND INPUTS                    #
 ##########################################################
+# This recipe omits `exp_tag`, `exp_dir`, and `inference_dir` on purpose.
+# `run.py` copies `training_config.exp_tag` and `training_config.exp_dir` here
+# before resolving `${exp_dir}`.
+#
+# The default output directory is `${exp_dir}/inference_transducer`.
+# For standalone `infer`, add either `exp_tag` or a concrete `exp_dir` here.
+# Add `inference_dir` only when you want a different output directory.
 
 ##########################################################
 #                    DATASET DEFINITION                  #
@@ -19,11 +28,15 @@
 #
 # Dataset splits:
 #   test:
+#     - split="valid" from `MiniAn4Dataset`
 #     - split="test" from `MiniAn4Dataset`
 # Notes:
 #   - actual data sources are defined via `${recipe_dir}`
 dataset:
   test:
+    - name: valid
+      data_src_args:
+        split: valid
     - name: test
       data_src_args:
         split: test

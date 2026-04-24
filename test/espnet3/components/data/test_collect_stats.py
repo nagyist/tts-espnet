@@ -9,7 +9,13 @@ from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 # Import the functions under test (adjust import path if your file/module path differs)
-from espnet3.components.data.collect_stats import collect_stats
+from espnet3.components.data.collect_stats import (
+    _build_model,
+    _chunk_indices,
+    _instantiate_dataset,
+    collect_stats,
+    collect_stats_batch,
+)
 
 mp.set_start_method("fork", force=True)
 
@@ -138,6 +144,14 @@ class DummyModel:
         mel = (x * self.scale).to(self.device)
         mel_lengths = lengths.to(self.device)
         return {"mel": mel, "mel_lengths": mel_lengths}
+
+
+class NoCollectModel:
+    def to(self, device):
+        return self
+
+    def eval(self):
+        return self
 
 
 # ---------------------------------------
