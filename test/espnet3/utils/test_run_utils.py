@@ -245,7 +245,8 @@ def test_validate_experiment_context_accepts_metrics_synced_from_inference() -> 
         metrics_config=metrics,
         stages_to_run=["infer", "measure"],
     )
-    
+
+
 def test_resolve_loaded_configs_ignores_none_entries() -> None:
     inference = OmegaConf.create({"inference_dir": "./exp/standalone_eval/inference"})
 
