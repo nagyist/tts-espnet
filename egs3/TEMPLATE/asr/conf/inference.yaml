@@ -12,6 +12,15 @@
 #                    PATHS AND INPUTS                    #
 ##########################################################
 recipe_dir: .
+# Common case:
+# - pass both `--training_config` and `--inference_config`
+# - `run.py` copies `training_config.exp_tag` / `training_config.exp_dir` here
+# - `${self_name:}` resolves to `inference`, so the default output directory is
+#   `${exp_dir}/inference`
+#
+# Standalone `infer` is also supported. In that case, set either `exp_tag` or a
+# concrete `exp_dir` below. Override `inference_dir` only when you want a
+# different output location.
 exp_tag:
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 data_dir: ${recipe_dir}/data
