@@ -63,7 +63,7 @@ class CombinedDataset:
         IndexError: If a requested index is outside the range of the combined dataset.
         ValueError: If index is a non-integer string that none of the underlying
             datasets accept as an utterance ID.
-        RuntimeError: If `get_text()` or `shard()` is called but not supported.
+        RuntimeError: If `shard()` is called but not supported.
         AssertionError: If output keys from different datasets are inconsistent.
 
     Example:
@@ -240,35 +240,6 @@ class CombinedDataset:
         raise ValueError(
             f"Utterance ID '{uid}' is not supported by the underlying datasets."
         ) from last_error
-
-    def get_text(self, idx):
-        """Retrieve the target text string for a given index.
-
-        This method delegates to the underlying dataset's `get_text(idx)` method.
-        It is typically used for extracting text sequences for purposes such as
-        training tokenizers or language models.
-
-        Raises:
-            RuntimeError: If not all datasets implement `get_text(idx)`.
-        """
-        if not self.get_text_available:
-            raise RuntimeError(
-                "Please define `get_text` function to all datasets."
-                "It should receive index of data and return target text."
-                "E.g., \n"
-                "def get_text(self, idx):\n"
-                "   return text\n"
-            )
-
-        if self._string_index_mode:
-            uid, dataset_idx, dataset_key = self._resolve_string_mode_index(idx)
-            dataset = self.datasets[dataset_idx]
-            return dataset.get_text(dataset_key)
-
-        for i, cum_len in enumerate(self.cumulative_lengths):
-            if idx < cum_len:
-                ds_idx = idx if i == 0 else idx - self.cumulative_lengths[i - 1]
-                return self.datasets[i].get_text(ds_idx)
 
     # ------------------------------------------------------------------
     # Internal helpers for string-index mode
