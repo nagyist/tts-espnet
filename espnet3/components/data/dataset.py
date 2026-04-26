@@ -142,23 +142,24 @@ class CombinedDataset:
                 " then all dataset should be a subclass of ShardedDataset."
             )
         if has_sharded:
-            num_shards_set = {
-                getattr(dataset, "num_shards", None) for dataset in self.datasets
+            total_shards_set = {
+                getattr(dataset, "total_shards", None) for dataset in self.datasets
             }
-            world_shard_size_set = {
-                getattr(dataset, "world_shard_size", None) for dataset in self.datasets
+            dist_world_size_set = {
+                getattr(dataset, "dist_world_size", None) for dataset in self.datasets
             }
-            if None in num_shards_set or None in world_shard_size_set:
+            if None in total_shards_set or None in dist_world_size_set:
                 raise RuntimeError(
-                    "ShardedDataset requires num_shards and world_shard_size to be set."
+                    "ShardedDataset requires total_shards and dist_world_size "
+                    "to be set."
                 )
-            if len(num_shards_set) != 1 or len(world_shard_size_set) != 1:
+            if len(total_shards_set) != 1 or len(dist_world_size_set) != 1:
                 raise RuntimeError(
-                    "All sharded datasets must share the same num_shards and "
-                    "world_shard_size."
+                    "All sharded datasets must share the same total_shards and "
+                    "dist_world_size."
                 )
-            self.num_shards = num_shards_set.pop()
-            self.world_shard_size = world_shard_size_set.pop()
+            self.total_shards = total_shards_set.pop()
+            self.dist_world_size = dist_world_size_set.pop()
 
         # This flag will be overrode by ESPnetLightningModule.
         self._use_espnet_collator = False
@@ -512,8 +513,9 @@ class ShardedDataset(ABC, Dataset):
     implement the `shard()` method.
 
     Attributes:
-        num_shards (int): Total number of shards in the dataset.
-        world_shard_size (int): Expected distributed world size when sharding.
+        total_shards (int): Total number of shards in the dataset.
+        dist_world_size (int): Distributed world size used by this sharding
+            scheme.
 
     Note:
         - This class is intended to be used with `CombinedDataset` in ESPnet.
@@ -522,8 +524,8 @@ class ShardedDataset(ABC, Dataset):
     Example:
         >>> class MyDataset(ShardedDataset):
         ...     def __init__(self):
-        ...         self.num_shards = 8
-        ...         self.world_shard_size = 4
+        ...         self.total_shards = 8
+        ...         self.dist_world_size = 4
         ...     def shard(self, idx):
         ...         return Subset(self, shard_indices[idx])
 
