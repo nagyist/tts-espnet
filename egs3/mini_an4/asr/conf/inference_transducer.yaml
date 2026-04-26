@@ -15,10 +15,8 @@
 #
 # The default output directory uses the stem of the file passed to
 # `--inference_config`.
-# For this file, `conf/inference_transducer.yaml` becomes
-# `${exp_dir}/inference_transducer`.
-# For standalone `infer`, add either `exp_tag` or a concrete `exp_dir` here.
-# Add `inference_dir` only when you want a different output directory.
+# If `inference_dir` is omitted, `conf/<name>.yaml` becomes `${exp_dir}/<name>`.
+# Override `inference_dir` only when you want a different output location.
 
 ##########################################################
 #                    DATASET DEFINITION                  #
