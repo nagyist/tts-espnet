@@ -13,9 +13,10 @@
 # `run.py` copies `training_config.exp_tag` and `training_config.exp_dir` here
 # before resolving `${exp_dir}`.
 #
-# The default output directory is `${exp_dir}/inference`.
-# For standalone `infer`, add either `exp_tag` or a concrete `exp_dir` here.
-# Add `inference_dir` only when you want a different output directory.
+# The default output directory uses the stem of the file passed to
+# `--inference_config`.
+# If `inference_dir` is omitted, `conf/<name>.yaml` becomes `${exp_dir}/<name>`.
+# Override `inference_dir` only when you want a different output location.
 
 ##########################################################
 #                    DATASET DEFINITION                  #
