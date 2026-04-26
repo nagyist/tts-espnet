@@ -1,16 +1,17 @@
 # test_data_organizer.py
 import numpy as np
 import pytest
-from hydra.utils import instantiate
 from omegaconf import OmegaConf
 
 from espnet2.train.preprocessor import AbsPreprocessor
+from espnet3.components.data import data_organizer as data_organizer_module
 from espnet3.components.data.data_organizer import (
     DataOrganizer,
     do_nothing,
 )
 from espnet3.components.data.dataset import (
     CombinedDataset,
+    DatasetWithTransform,
     ShardedDataset,
 )
 
@@ -71,13 +72,11 @@ from espnet3.components.data.dataset import (
 # | test_data_organizer_invalid_preprocessor_type | AssertionError     |
 # | test_combined_dataset_sharded_consistency_error | RuntimeError       |
 
-DUMMY_DATASET_TARGET = (
-    "test.espnet3.components.data.test_data_organizer." "DummyDataset"
-)
 DUMMY_TRANSFORM_TARGET = (
     "test.espnet3.components.data.test_data_organizer." "DummyTransform"
 )
-
+DUMMY_DATA_SRC = "dummy/asr"
+DUMMY_SHARDED_DATA_SRC = "dummy/sharded"
 
 DUMMY_PREPROCESSOR_TARGET = (
     "test.espnet3.components.data.test_data_organizer." "DummyPreprocessor"
@@ -143,32 +142,42 @@ class DummyShardedDataset(ShardedDataset):
         return self  # dummy
 
 
+def _entry(name: str, *, transform: bool = False, data_src: str = DUMMY_DATA_SRC):
+    entry = {
+        "name": name,
+        "data_src": data_src,
+        "data_src_args": {},
+    }
+    if transform:
+        entry["transform"] = {"_target_": DUMMY_TRANSFORM_TARGET}
+    return entry
+
+
 # Fixtures
 @pytest.fixture
 def dummy_dataset_config():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
-        "test": [
-            {
-                "name": "test_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
+        "test": [_entry("test_dummy")],
     }
     config = OmegaConf.create(config)
     return config
+
+
+@pytest.fixture(autouse=True)
+def patch_dataset_reference(monkeypatch):
+    def _instantiate_dataset_reference(config, recipe_dir=None):
+        plain = OmegaConf.to_container(OmegaConf.create(config), resolve=False)
+        if plain.get("data_src") == DUMMY_SHARDED_DATA_SRC:
+            return DummyShardedDataset()
+        return DummyDataset()
+
+    monkeypatch.setattr(
+        data_organizer_module,
+        "instantiate_dataset_reference",
+        _instantiate_dataset_reference,
+    )
 
 
 # Tests
@@ -190,9 +199,9 @@ def test_combined_dataset():
 def test_data_organizer_init(dummy_dataset_config):
     config = dummy_dataset_config
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
-        test=instantiate(config["test"]),
+        train=config["train"],
+        valid=config["valid"],
+        test=config["test"],
         preprocessor=DummyPreprocessor(),
     )
     assert len(organizer.train) == 2
@@ -204,25 +213,14 @@ def test_data_organizer_init(dummy_dataset_config):
 
 def test_data_organizer_without_test():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
         # No "test" field
     }
     config = OmegaConf.create(config)
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
         preprocessor=DummyPreprocessor(),
     )
 
@@ -235,18 +233,10 @@ def test_data_organizer_test_only():
     config = {
         # No "train"
         # No "valid"
-        "test": [
-            {
-                "name": "test_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-        ],
+        "test": [_entry("test_dummy", transform=True)],
     }
 
-    organizer = DataOrganizer(
-        test=instantiate(config["test"]), preprocessor=DummyPreprocessor()
-    )
+    organizer = DataOrganizer(test=config["test"], preprocessor=DummyPreprocessor())
 
     assert organizer.train is None
     assert organizer.valid is None
@@ -257,25 +247,12 @@ def test_data_organizer_test_only():
 @pytest.mark.parametrize("train_count, valid_count", [(1, 1), (2, 2)])
 def test_data_organizer_train_valid_multiple(train_count, valid_count):
     config = {
-        "train": [
-            {
-                "name": f"train{i}",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-            for i in range(train_count)
-        ],
-        "valid": [
-            {
-                "name": f"valid{i}",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-            for i in range(valid_count)
-        ],
+        "train": [_entry(f"train{i}", transform=True) for i in range(train_count)],
+        "valid": [_entry(f"valid{i}") for i in range(valid_count)],
     }
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
         preprocessor=DummyPreprocessor(),
     )
     assert len(organizer.train) == 2 * train_count
@@ -287,66 +264,33 @@ def test_data_organizer_train_valid_multiple(train_count, valid_count):
 def test_data_organizer_test_multiple_sets():
     config = {
         "test": [
-            {
-                "name": "test_clean",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            },
-            {
-                "name": "test_other",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            },
+            _entry("test_clean"),
+            _entry("test_other", transform=True),
         ]
     }
-    organizer = DataOrganizer(
-        test=instantiate(config["test"]), preprocessor=DummyPreprocessor()
-    )
+    organizer = DataOrganizer(test=config["test"], preprocessor=DummyPreprocessor())
     assert "test_clean" in organizer.test
     assert "test_other" in organizer.test
 
 
 def test_data_organizer_transform_only():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
     }
-    organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
-    )
+    organizer = DataOrganizer(train=config["train"], valid=config["valid"])
     assert organizer.train[0]["text"] == "HELLO"
     assert organizer.valid[0]["text"] == "hello"
 
 
 def test_data_organizer_preprocessor_only():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy")],
+        "valid": [_entry("valid_dummy")],
     }
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
         preprocessor=DummyPreprocessor(),
     )
     assert organizer.train[0]["text"] == "[dummy] hello"
@@ -356,19 +300,8 @@ def test_data_organizer_preprocessor_only():
 def test_data_organizer_accepts_raw_configs():
     config = OmegaConf.create(
         {
-            "train": [
-                {
-                    "name": "train_dummy",
-                    "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                    "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-                }
-            ],
-            "valid": [
-                {
-                    "name": "valid_dummy",
-                    "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                }
-            ],
+            "train": [_entry("train_dummy", transform=True)],
+            "valid": [_entry("valid_dummy")],
             "preprocessor": {"_target_": DUMMY_PREPROCESSOR_TARGET},
         }
     )
@@ -381,25 +314,41 @@ def test_data_organizer_accepts_raw_configs():
     assert organizer.valid[0]["text"] == "[dummy] hello"
 
 
+def test_data_organizer_passes_recipe_dir_to_ref_less_entries(monkeypatch):
+    captured = []
+
+    def _instantiate_dataset_reference(config, recipe_dir=None):
+        captured.append((dict(config), recipe_dir))
+        return DummyDataset()
+
+    monkeypatch.setattr(
+        data_organizer_module,
+        "instantiate_dataset_reference",
+        _instantiate_dataset_reference,
+    )
+
+    organizer = DataOrganizer(
+        train=[{"data_src_args": {"split": "train"}}],
+        valid=[{"data_src_args": {"split": "valid"}}],
+        recipe_dir="/tmp/local_recipe",
+    )
+
+    assert len(organizer.train) == 2
+    assert len(organizer.valid) == 2
+    assert captured == [
+        ({"data_src_args": {"split": "train"}}, "/tmp/local_recipe"),
+        ({"data_src_args": {"split": "valid"}}, "/tmp/local_recipe"),
+    ]
+
+
 def test_data_organizer_transform_and_preprocessor():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
     }
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
         preprocessor=DummyPreprocessor(),
     )
     assert organizer.train[0]["text"] == "[dummy] HELLO"
@@ -408,16 +357,11 @@ def test_data_organizer_transform_and_preprocessor():
 
 def test_data_organizer_train_only_assertion():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ]
+        "train": [_entry("train_dummy")]
         # valid is missing
     }
     with pytest.raises(RuntimeError):
-        DataOrganizer(train=instantiate(config["train"]))
+        DataOrganizer(train=config["train"])
 
 
 def test_data_organizer_empty_train_valid_ok():
@@ -426,8 +370,8 @@ def test_data_organizer_empty_train_valid_ok():
         "valid": [],
     }
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
     )
     assert len(organizer.train) == 0
     assert len(organizer.valid) == 0
@@ -466,47 +410,26 @@ def test_data_organizer_transform_none():
 
 def test_data_organizer_invalid_preprocessor_type():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy")],
+        "valid": [_entry("valid_dummy")],
     }
     with pytest.raises(AssertionError):
         DataOrganizer(
-            train=instantiate(config["train"]),
-            valid=instantiate(config["valid"]),
+            train=config["train"],
+            valid=config["valid"],
             preprocessor="not_callable",
         )
 
 
 def test_espnet_preprocessor_without_transform():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                # transform is omitted
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy")],
+        "valid": [_entry("valid_dummy")],
     }
 
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
         preprocessor=ESPnetPreprocessor(),  # ESPnet-style preprocessor
     )
 
@@ -516,24 +439,13 @@ def test_espnet_preprocessor_without_transform():
 
 def test_espnet_preprocessor_with_transform():
     config = {
-        "train": [
-            {
-                "name": "train_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-                "transform": {"_target_": DUMMY_TRANSFORM_TARGET},
-            }
-        ],
-        "valid": [
-            {
-                "name": "valid_dummy",
-                "dataset": {"_target_": DUMMY_DATASET_TARGET},
-            }
-        ],
+        "train": [_entry("train_dummy", transform=True)],
+        "valid": [_entry("valid_dummy")],
     }
 
     organizer = DataOrganizer(
-        train=instantiate(config["train"]),
-        valid=instantiate(config["valid"]),
+        train=config["train"],
+        valid=config["valid"],
         preprocessor=ESPnetPreprocessor(),  # ESPnet-style preprocessor
     )
 
@@ -555,3 +467,103 @@ def test_combined_dataset_sharded_consistency_error():
             transforms=[(DummyTransform(), DummyPreprocessor())] * 2,
             use_espnet_preprocessor=False,
         )
+
+
+def test_combined_dataset_rejects_non_numeric_string_index():
+    combined = CombinedDataset(
+        [DummyDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(ValueError, match="utterance ID to be an integer index"):
+        combined["abc"]
+
+
+def test_combined_dataset_wraps_dataset_access_error():
+    class BrokenDataset:
+        def __init__(self):
+            self.access_count = 0
+
+        def __len__(self):
+            return 1
+
+        def __getitem__(self, idx):
+            self.access_count += 1
+            if self.access_count == 1:
+                return {"audio": b"abc", "text": "hello"}
+            raise KeyError(f"missing {idx}")
+
+    combined = CombinedDataset(
+        [BrokenDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(RuntimeError, match="Failed to access dataset at index 0"):
+        combined[0]
+
+
+def test_combined_dataset_rejects_out_of_range_index():
+    combined = CombinedDataset(
+        [DummyDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(IndexError, match="Index out of range in CombinedDataset"):
+        combined[100]
+
+
+def test_combined_dataset_shard_requires_sharded_datasets():
+    combined = CombinedDataset(
+        [DummyDataset()],
+        [(do_nothing, do_nothing)],
+    )
+
+    with pytest.raises(RuntimeError, match="All dataset should be the subclass"):
+        combined.shard(0)
+
+
+def test_data_organizer_repr_handles_missing_train_valid_and_multiple_tests():
+    organizer = DataOrganizer(
+        test=[
+            _entry("test_clean"),
+            _entry("test_other", transform=True),
+        ],
+        preprocessor=DummyPreprocessor(),
+    )
+
+    text = repr(organizer)
+
+    assert "train=None" in text
+    assert "valid=None" in text
+    assert "test_clean:" in text
+    assert "test_other:" in text
+
+
+def test_combined_dataset_repr_lists_datasets_and_transforms():
+    combined = CombinedDataset(
+        [DummyDataset(), DummyDataset()],
+        [(DummyTransform(), DummyPreprocessor())] * 2,
+    )
+
+    text = repr(combined)
+
+    assert "CombinedDataset(" in text
+    assert "total_len=4" in text
+    assert "transform=" in text
+    assert "preprocessor=" in text
+
+
+def test_dataset_with_transform_repr_includes_wrapped_components():
+    wrapped = DatasetWithTransform(
+        DummyDataset(),
+        DummyTransform(),
+        DummyPreprocessor(),
+        use_espnet_preprocessor=True,
+    )
+
+    text = repr(wrapped)
+
+    assert "DatasetWithTransform(" in text
+    assert "transform=" in text
+    assert "preprocessor=" in text
+    assert "use_espnet_preprocessor=True" in text
