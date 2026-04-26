@@ -24,10 +24,9 @@ task:
 # Path scaffold relative to the recipe root.
 recipe_dir: .
 data_dir: ${recipe_dir}/data
-exp_tag:
+exp_tag: ${self_name:}
 exp_dir: ${recipe_dir}/exp/${exp_tag}
 stats_dir: ${recipe_dir}/exp/stats
-inference_dir: ${exp_dir}/inference
 
 # Directory where this recipe stores prepared manifests and any recipe-local
 # dataset artifacts.
