@@ -2,137 +2,39 @@
 
 Covers parallel_dims, pipeline, grouped_moe, and qwen3 utility functions.
 
-The parallel_utils source modules import from ``torchtitan`` and
-``transformers.models.qwen3_moe.modeling_qwen3_moe`` at module load time.
-Neither is a hard CI dependency, so this file installs lightweight stubs
-for the symbols these modules reference before importing them. When the
-real packages are available (e.g. on a GPU/FSDP2 dev environment), the
-stubs are skipped and the real implementations are used.
+All tests run on CPU only and require no external accounts. Real
+packages are used throughout — no torchtitan or transformers stubs.
 
-All tests here run on CPU only.
+Skip mechanics:
+- ``torchtitan`` is part of the ``espnet[speechlm]`` extra (Linux-only).
+  When it is not importable, the file is skipped at collection time.
+- ``transformers.models.qwen3_moe.modeling_qwen3_moe`` is imported by
+  the source. If the dev env has a broken ``flash_attn`` binary the
+  whole transformers attention chain fails to load — the file is
+  skipped in that case too.
+- The compile path in ``apply_torch_compile_qwen3`` calls
+  ``torch._C._dynamo.eval_frame._set_lru_cache`` which was removed in
+  newer PyTorch; tests that hit it are skipped when the symbol is gone.
 """
 
-import importlib.machinery
-import sys
-import types
-
+import pytest
+import torch
 import torch.nn as nn
+import torch.nn.functional as F
 
-# ---------------------------------------------------------------------------
-# Install torchtitan stubs (if torchtitan is not installed)
-# ---------------------------------------------------------------------------
-if "torchtitan" not in sys.modules:
-    _tt = types.ModuleType("torchtitan")
-    _tt.__spec__ = importlib.machinery.ModuleSpec("torchtitan", loader=None)
+# Skip whole module if torchtitan isn't installed (Linux-only speechlm extra).
+pytest.importorskip("torchtitan", reason="torchtitan not installed")
 
-    _tt_dist = types.ModuleType("torchtitan.distributed")
-    _tt_dist.__spec__ = importlib.machinery.ModuleSpec(
-        "torchtitan.distributed", loader=None
-    )
+# Skip whole module if the HF Qwen3-MoE modeling submodule can't be imported
+# (e.g. broken flash_attn ABI in the dev env).
+pytest.importorskip(
+    "transformers.models.qwen3_moe.modeling_qwen3_moe",
+    reason="transformers Qwen3-MoE modeling module not importable",
+)
 
-    class _StubMesh:
-        def __init__(self, size=1):
-            self._size = size
-
-        def size(self):
-            return self._size
-
-        def get_group(self):
-            return None
-
-        def __getitem__(self, key):
-            return _StubMesh(self._size)
-
-    class _StubParallelDims:
-        def __init__(
-            self,
-            dp_replicate=1,
-            dp_shard=-1,
-            cp=1,
-            tp=1,
-            pp=1,
-            ep=1,
-            etp=1,
-            world_size=1,
-        ):
-            self.dp_replicate = dp_replicate
-            self.dp_shard = world_size if dp_shard == -1 else dp_shard
-            self.cp = cp
-            self.tp = tp
-            self.pp = pp
-            self.ep = ep
-            self.etp = etp
-            self.world_size = world_size
-            self.ep_enabled = ep > 1
-            self.pp_enabled = pp > 1
-            self.fsdp_enabled = self.dp_shard > 1
-            self.dp_replicate_enabled = dp_replicate > 1
-
-        def build_mesh(self):
-            pass
-
-        def get_mesh(self, name):
-            return _StubMesh(self.dp_shard)
-
-        def get_optional_mesh(self, names):
-            return {"efsdp": _StubMesh(max(1, self.dp_shard // self.ep))}
-
-    _tt_dist.ParallelDims = _StubParallelDims
-    _tt.distributed = _tt_dist
-
-    _tt_deepep = types.ModuleType("torchtitan.distributed.deepep")
-    _tt_deepep.__spec__ = importlib.machinery.ModuleSpec(
-        "torchtitan.distributed.deepep", loader=None
-    )
-    _tt_deepep.dispatch_tokens = lambda *a, **k: (None, None, None)
-    _tt_deepep.combine_tokens = lambda *a, **k: None
-    _tt_deepep.sync_combine = lambda: None
-
-    _tt_deepep_dp = types.ModuleType("torchtitan.distributed.deepep.deepep")
-    _tt_deepep_dp.__spec__ = importlib.machinery.ModuleSpec(
-        "torchtitan.distributed.deepep.deepep", loader=None
-    )
-    _tt_deepep_dp.get_buffer = lambda *a, **k: None
-    _tt_deepep_dp.get_hidden_bytes = lambda *a, **k: 0
-
-    sys.modules["torchtitan"] = _tt
-    sys.modules["torchtitan.distributed"] = _tt_dist
-    sys.modules["torchtitan.distributed.deepep"] = _tt_deepep
-    sys.modules["torchtitan.distributed.deepep.deepep"] = _tt_deepep_dp
-
-
-# ---------------------------------------------------------------------------
-# Resolve a Qwen3MoeSparseMoeBlock base class.
-#
-# On CI, the real transformers class is importable — but its __init__ requires
-# a Qwen3MoeConfig. Locally, flash_attn may be broken, in which case we stub
-# the modeling submodule. Either way, _BareQwen3MoeSparseMoeBlock (defined
-# below) skips the parent __init__ so tests can populate attributes manually
-# (same trick GroupedMoeBlock uses in grouped_moe.py).
-# ---------------------------------------------------------------------------
-try:
-    from transformers.models.qwen3_moe.modeling_qwen3_moe import (  # noqa: F401
-        Qwen3MoeSparseMoeBlock as _Qwen3MoeSparseMoeBlockBase,
-    )
-except Exception:
-    _m = types.ModuleType("transformers.models.qwen3_moe.modeling_qwen3_moe")
-    _m.__spec__ = importlib.machinery.ModuleSpec(
-        "transformers.models.qwen3_moe.modeling_qwen3_moe", loader=None
-    )
-
-    class _Qwen3MoeSparseMoeBlockBase(nn.Module):
-        """Stand-in for the real class when transformers fails to import."""
-
-    _m.Qwen3MoeSparseMoeBlock = _Qwen3MoeSparseMoeBlockBase
-    sys.modules["transformers.models.qwen3_moe.modeling_qwen3_moe"] = _m
-
-
-# ---------------------------------------------------------------------------
-# Stub pipeline schedule classes so we can test build_pipeline without dist.
-# ---------------------------------------------------------------------------
-import pytest  # noqa: E402
-import torch  # noqa: E402
-import torch.nn.functional as F  # noqa: E402
+from transformers.models.qwen3_moe.modeling_qwen3_moe import (  # noqa: E402
+    Qwen3MoeSparseMoeBlock as _Qwen3MoeSparseMoeBlockBase,
+)
 
 from espnet2.speechlm.model.speechlm.parallel_utils import (  # noqa: E402
     parallel_strategies,
@@ -758,6 +660,10 @@ class TestParallelizeQwen3HF:
             parallelize_qwen3_hf,
         )
 
+        # No build_mesh() — every parallel dim is 1, so fsdp_enabled,
+        # ep_enabled, and pp_enabled are all False. parallelize_qwen3_hf
+        # never accesses a device mesh on this configuration, which lets
+        # us avoid initializing torch.distributed.
         pd = ParallelDims(
             dp_replicate=1,
             dp_shard=1,
@@ -768,7 +674,6 @@ class TestParallelizeQwen3HF:
             etp=1,
             world_size=1,
         )
-        pd.build_mesh()
 
         model = _MockHFModel([_MockDenseLayer(), _MockDenseLayer()])
         _patch_cuda_identity(model)
@@ -804,7 +709,6 @@ class TestParallelizeQwen3HF:
             etp=1,
             world_size=1,
         )
-        pd.build_mesh()
 
         model = _MockHFModel([_MockDenseLayer()])
         _patch_cuda_identity(model)
@@ -825,12 +729,22 @@ class TestParallelizeQwen3HF:
 # parallel_dims.init_parallel_dims
 # ===========================================================================
 class TestInitParallelDims:
+    """Tests for init_parallel_dims.
+
+    The function calls ``parallel_dims.build_mesh()`` which requires
+    ``torch.distributed`` initialized. We patch ``build_mesh`` to a
+    no-op so the real ParallelDims constructor still runs but the
+    mesh-build step is skipped, keeping these tests dist-init free.
+    """
+
     def test_parses_titan_config(self):
         """init_parallel_dims forwards titan_config keys to ParallelDims.
 
         Returns (parallel_dims, local_rank, global_rank).
         """
         from unittest.mock import patch
+
+        from torchtitan.distributed import ParallelDims
 
         from espnet2.speechlm.model.speechlm.parallel_utils.parallel_dims import (
             init_parallel_dims,
@@ -852,6 +766,7 @@ class TestInitParallelDims:
                 "parallel_dims.torch.cuda.current_device",
                 return_value=2,
             ),
+            patch.object(ParallelDims, "build_mesh", lambda self: None),
         ):
             pd, local_rank, global_rank = init_parallel_dims(
                 {"dp_replicate": 1, "dp_shard": -1, "pp_degree": 1, "ep": 1}
@@ -865,6 +780,8 @@ class TestInitParallelDims:
     def test_ep_in_config(self):
         """ep > 1 is forwarded and triggers the efsdp log path."""
         from unittest.mock import patch
+
+        from torchtitan.distributed import ParallelDims
 
         from espnet2.speechlm.model.speechlm.parallel_utils.parallel_dims import (
             init_parallel_dims,
@@ -886,6 +803,7 @@ class TestInitParallelDims:
                 "parallel_dims.torch.cuda.current_device",
                 return_value=0,
             ),
+            patch.object(ParallelDims, "build_mesh", lambda self: None),
         ):
             pd, _, _ = init_parallel_dims(
                 {"dp_replicate": 1, "dp_shard": 8, "pp_degree": 1, "ep": 4}
