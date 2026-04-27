@@ -17,6 +17,8 @@ Skip mechanics:
   newer PyTorch; tests that hit it are skipped when the symbol is gone.
 """
 
+import sys
+
 import pytest
 import torch
 import torch.nn as nn
@@ -24,6 +26,10 @@ import torch.nn.functional as F
 
 # Skip whole module if torchtitan isn't installed (Linux-only speechlm extra).
 pytest.importorskip("torchtitan", reason="torchtitan not installed")
+pytest.importorskip(
+    "torchtitan.distributed.deepep",
+    reason="torchtitan.distributed.deepep submodule not importable",
+)
 
 # Skip whole module if the HF Qwen3-MoE modeling submodule can't be imported
 # (e.g. broken flash_attn ABI in the dev env).
@@ -31,6 +37,19 @@ pytest.importorskip(
     "transformers.models.qwen3_moe.modeling_qwen3_moe",
     reason="transformers Qwen3-MoE modeling module not importable",
 )
+
+# Drop any non-package parallel_utils stub left in sys.modules by sibling
+# conftests (test/espnet2/speechlm/trainer/conftest.py installs a flat-module
+# stub when the real package is not yet on the base branch). With the
+# importorskip checks above we know the real torchtitan/HF deps are
+# available, so the real package can be imported — wipe the stale stub.
+for _name in [
+    n
+    for n in list(sys.modules)
+    if n == "espnet2.speechlm.model.speechlm.parallel_utils"
+    or n.startswith("espnet2.speechlm.model.speechlm.parallel_utils.")
+]:
+    sys.modules.pop(_name, None)
 
 from transformers.models.qwen3_moe.modeling_qwen3_moe import (  # noqa: E402
     Qwen3MoeSparseMoeBlock as _Qwen3MoeSparseMoeBlockBase,
